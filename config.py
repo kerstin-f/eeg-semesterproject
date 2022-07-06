@@ -19,14 +19,10 @@ user = getpass.getuser()  # Username of the user running the scripts
 host = getfqdn()  # Hostname of the machine running the scripts
 
 # You want to add your machine to this list
-if user == 'vanvliet':
+if user == 'kerst':
     # My laptop
     raw_data_dir = './data'
-    n_jobs = 4  # My laptop has 4 cores
-elif host == 'nbe-024.org.aalto.fi' and user == 'vanvlm1':
-    # My workstation
-    raw_data_dir = './data'
-    n_jobs = 8  # My workstation has 8 cores
+    n_jobs = 1  # My laptop has 4 cores
 else:
     # Defaults
     raw_data_dir = './data'

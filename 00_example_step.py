@@ -27,7 +27,8 @@ np.savetxt(fname.output(subject=subject), data)
 with mne.open_report(fname.report(subject=subject)) as report:
     fig = plt.figure()
     plt.plot(data.T)
-    report.add_figs_to_section(fig, 'Filtered data', section='filtering',
-                               replace=True)
+    # report.add_figs_to_section(fig, 'Filtered data', section='filtering',
+    #                            replace=True)
+    report.add_figure(fig, 'Filtered data')
     report.save(fname.report_html(subject=subject), overwrite=True,
                 open_browser=False)
