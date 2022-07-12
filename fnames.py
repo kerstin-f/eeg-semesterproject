@@ -62,7 +62,6 @@ Author: Marijn van Vliet <w.m.vanvliet@gmail.com>
 """
 import string
 
-
 class FileNames(object):
     """Utility class to manage filenames."""
 

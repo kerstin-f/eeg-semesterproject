@@ -9,7 +9,11 @@ Configuration parameters for the study.
 import os
 import getpass
 from socket import getfqdn
+from typing import Optional
+
+from numpy import NaN
 from fnames import FileNames
+
 
 ###############################################################################
 # Determine which user is running the scripts on which machine and set the path
@@ -22,7 +26,7 @@ host = getfqdn()  # Hostname of the machine running the scripts
 if user == 'kerst':
     # My laptop
     raw_data_dir = './data'
-    n_jobs = 1  # My laptop has 4 cores
+    n_jobs = 1
 else:
     # Defaults
     raw_data_dir = './data'
@@ -35,12 +39,44 @@ os.environ['OMP_NUM_THREADS'] = str(n_jobs)
 ###############################################################################
 # These are all the relevant parameters for the analysis.
 
-sample_rate = 1000  # Hz
-fmin = 1.0  # Hz
-fmax = 20.0  # Hz
+bids_root = "./data/p3/"
+task = "p3" 
 
-# All subjects
-subjects = ['sub01', 'sub02']
+# # All subjects from 1 to N
+# count = 0
+# for _, dirs, _ in os.walk(bids_root):
+# 	for dir in dirs:
+# 		if(dir.startswith('sub-')):
+# 			count = count + 1
+# subjects = ["%.3d" % i for i in range(1,count+1)]
+
+subjects = ['001', '002', '003']
+
+
+###############################################################################
+# Frequency filtering
+h_freq = 0.5
+l_freq = 50
+h_trans_bandwidth = None
+l_trans_bandwidth = None
+
+###############################################################################
+# Epoching
+conditions = ['stimulus']
+epochs_metadata_tmin = -0.1
+"""
+The beginning of the time window for metadata generation, in seconds,
+relative to the time-locked event of the respective epoch. This may be less
+than or larger than the epoch's first time point. If ``None``, use the first
+time point of the epoch.
+"""
+epochs_metadata_tmax = 1
+"""
+Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
+window for metadata generation.
+"""
+
+eeg_reference = 'average'
 
 ###############################################################################
 # Templates for filenames
@@ -55,10 +91,16 @@ fname.add('raw_data_dir', raw_data_dir)
 fname.add('processed_data_dir', './processed')
 fname.add('figures_dir', './figures')
 
-# The data files that are used and produced by the analysis steps
-fname.add('input', '{raw_data_dir}/input-{subject}.txt')
-fname.add('output', '{processed_data_dir}/output-{subject}.txt')
-fname.add('grand_average', '{processed_data_dir}/grand_average.txt')
+# The data files that are used by the analysis steps
+fname.add('precomputed_ica_tsv', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_ica.tsv')
+fname.add('precomputed_ica_set', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_ica.set')
+fname.add('precomputed_badChannels', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_badChannels.tsv')
+fname.add('precomputed_badSegments', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_badSegments.csv')
+
+# The data files that are produced by the analysis steps
+fname.add('filtering', '{processed_data_dir}/filtered-{subject}.fif')
+fname.add('epoching', '{processed_data_dir}/epochs-{subject}.fif')
+fname.add('cleaned_epochs', '{processed_data_dir}/cleaned_epochs.fif')
 
 # The figures
 fname.add('figure1', '{figures_dir}/figure1.pdf')

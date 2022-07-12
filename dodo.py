@@ -29,7 +29,7 @@ def task_check():
 
 # This example task executes a single analysis script for each subject, giving
 # the subject as a command line parameter to the script.
-def task_example_step():
+def task_filtering():
     """Step 00: An example analysis step that is executed for each subject."""
     # Run the example script for each subject in a sub-task.
     for subject in subjects:
@@ -42,42 +42,65 @@ def task_example_step():
 
             # If any of these files change, the script needs to be re-run. Make
             # sure that the script itself is part of this list!
-            file_dep=[fname.input(subject=subject), '00_example_step.py'],
+            file_dep=['00_filtering.py'],
 
             # The files produced by the script
-            targets=[fname.output(subject=subject)],
+            targets=[fname.filtering(subject=subject)],
 
             # How the script needs to be called. Here we indicate it should
             # have one command line parameter: the name of the subject.
-            actions=['python 00_example_step.py %s' % subject],
+            actions=['python 00_filtering.py %s' % subject],
         )
 
+def task_epoching():
+    """Step 01: An example analysis step that is executed for each subject."""
+    # Extract epochs for each subject.
+    for subject in subjects:
+        yield dict(
+            task_dep=['filtering'],
+            name=subject,
+            file_dep=['00_filtering.py', '01_epoching.py'],
+            targets=[fname.epoching(subject=subject)],
+            actions=['python 01_epoching.py %s' % subject],
+        )
 
-# Here is another example task that averages across subjects.
-def task_example_summary():
-    """Step 01: Average across subjects."""
-    return dict(
-        task_dep=['example_step'],  # This task should come after `task_example_step`
-        file_dep=[fname.output(subject=s) for s in subjects] + ['01_grand_average.py'],
-        targets=[fname.grand_average],
-        actions=['python 01_grand_average.py'],
-    )
+def task_apply_ica():
+    """Step 02: An example analysis step that is executed for each subject."""
+    # Extract epochs for each subject.
+    for subject in subjects:
+        yield dict(
+            task_dep=['epoching'],
+            name=subject,
+            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py'],
+            targets=[fname.cleaned_epochs(subject=subject)],
+            actions=['python 02_apply_ica.py %s' % subject],
+        )
+
+# # Here is another example task that averages across subjects.
+# def task_example_summary():
+#     """Step 01: Average across subjects."""
+#     return dict(
+#         task_dep=['example_step'],  # This task should come after `task_example_step`
+#         file_dep=[fname.output(subject=s) for s in subjects] + ['01_grand_average.py'],
+#         targets=[fname.grand_average],
+#         actions=['python 01_grand_average.py'],
+#     )
 
 
-def task_figures():
-    """Make all figures. Each figure is a sub-task."""
-    # Make figure 1
-    yield dict(
-        name='figure_example1',
-        file_dep=['figure_example1.py'],
-        targets=[fname.figure1],
-        actions=['python figure_example1.py'],
-    )
+# def task_figures():
+#     """Make all figures. Each figure is a sub-task."""
+#     # Make figure 1
+#     yield dict(
+#         name='figure_example1',
+#         file_dep=['figure_example1.py'],
+#         targets=[fname.figure1],
+#         actions=['python figure_example1.py'],
+#     )
 
-    # Make figure 2
-    yield dict(
-        name='figure_grand_average',
-        file_dep=[fname.grand_average, 'figure_grand_average.py'],
-        targets=[fname.figure_grand_average],
-        actions=['python figure_grand_average.py'],
-    )
+#     # Make figure 2
+#     yield dict(
+#         name='figure_grand_average',
+#         file_dep=[fname.grand_average, 'figure_grand_average.py'],
+#         targets=[fname.figure_grand_average],
+#         actions=['python figure_grand_average.py'],
+#     )
