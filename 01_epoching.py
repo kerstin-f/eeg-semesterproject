@@ -3,14 +3,9 @@ Perform bandpass filtering.
 """
 import argparse
 import mne
-import utils
 import numpy as np
-from mne_bids import (BIDSPath, read_raw_bids)
 from matplotlib import pyplot as plt
-from config import fname, conditions, epochs_metadata_tmin, epochs_metadata_tmax, eeg_reference
-
-# All parameters are defined in config.py
-from config import fname, task, bids_root, l_freq, h_freq, h_trans_bandwidth, l_trans_bandwidth
+from config import fname, conditions, epochs_metadata_tmin, epochs_metadata_tmax, eeg_reference, analyze_channel_epoching
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
@@ -57,11 +52,10 @@ epochs.set_eeg_reference(eeg_reference, projection=projection)
 print(f'Writing {len(epochs)} epochs to disk.')
 epochs.save(fname.epoching(subject=subject), overwrite=True)
 
-
 # Add a plot of the data to the HTML report
 with mne.open_report(fname.report(subject=subject)) as report:
     # Missing: Plot raw data and power spectral density.
+    report.add_epochs(epochs=epochs, title='Epochs from "epochs"')
     fig = mne.viz.plot_evoked(evoked=epochs.average(), show=False, picks="Cz")
-    report.add_figure(fig,'Epoched data: Channel Cz')
-    report.save(fname.report_html(subject=subject), overwrite=True,
-                open_browser=False)
+    report.add_figure(fig,'Epoched data: Channel Cz', replace=True)
+    report.save(fname.report_html(subject=subject), overwrite=True,open_browser=False)

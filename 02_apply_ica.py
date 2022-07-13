@@ -5,13 +5,14 @@ import argparse
 import mne
 import numpy as np
 import pandas as pd
+import utils
 from mne_bids import (BIDSPath, read_raw_bids)
 from mne.preprocessing import read_ica
 from matplotlib import pyplot as plt
 from config import fname
 
 # All parameters are defined in config.py
-from config import fname, task, bids_root, l_freq, h_freq, h_trans_bandwidth, l_trans_bandwidth
+from config import fname, task
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
@@ -23,20 +24,23 @@ print('Processing subject:', subject)
 # Missing: Adding report of ica
 
 # Load ICA.
-ica = read_ica(fname=fname.precomputed_ica_set(subject=subject))
-precomputed_ica_tsv = pd.read_csv(fname.precomputed_ica_tsv(subject=subject), sep='\t')
+ica, badComps = utils.load_precomputed_ica(subject)
+
+# Problem: Wiese hier raw und nicht epochs?
+ica = utils.add_ica_info(utils.import_raw(subject, task), ica)
 
 # Select ICs to remove.
-ica.exclude = (precomputed_ica_tsv.loc[0].to_list())
+ica.exclude = badComps
 
 # Load epochs to reject ICA components.
 epochs = mne.read_epochs(fname.epoching(subject=subject), preload=True)
+
 # Missing: epochs.drop_bad(cfg.ica_reject)
 
-epochs_cleaned = ica.apply(epochs.copy())
+cleaned_epochs = ica.apply(epochs.copy())
 
 # Save reconstructed epochs after ICA
-epochs_cleaned.save(fname.cleaned_epochs(subject=subject), overwrite=True)
+cleaned_epochs.save(fname.cleaned_epochs(subject=subject), overwrite=True)
 
     # # Compare ERP/ERF before and after ICA artifact rejection. The evoked
     # # response is calculated across ALL epochs, just like ICA was run on
@@ -59,7 +63,10 @@ epochs_cleaned.save(fname.cleaned_epochs(subject=subject), overwrite=True)
 # Add a plot of the data to the HTML report
 with mne.open_report(fname.report(subject=subject)) as report:
     # Missing: Plot raw data and power spectral density.
-    fig = mne.viz.plot_evoked(evoked=epochs.average(), show=False, picks="Cz")
-    report.add_figure(fig,'Epoched data: Channel Cz')
-    report.save(fname.report_html(subject=subject), overwrite=True,
-                open_browser=False)
+    # fig = mne.viz.plot_evoked(evoked=epochs.average(), show=False, picks="Cz")
+    fig_comp = ica.plot_components(range(20), show=False)
+    report.add_figure(fig_comp,'ICA components:')
+    # Problem: Does add_ica_info fix the problem?
+    # fig_props = ica.plot_properties(epochs,show=False,psd_args={'fmax': 35.},reject=None)
+    # report.add_figure(fig_comp,'ICA properties: Channel Cz:')
+    report.save(fname.report_html(subject=subject), overwrite=True, open_browser=False)

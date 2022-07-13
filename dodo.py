@@ -17,7 +17,6 @@ DOIT_CONFIG = dict(
     sort='definition',
 )
 
-
 def task_check():
     """Check the system dependencies."""
     return dict(
@@ -74,6 +73,19 @@ def task_apply_ica():
             file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py'],
             targets=[fname.cleaned_epochs(subject=subject)],
             actions=['python 02_apply_ica.py %s' % subject],
+        )
+
+def task_make_evoked():
+    """Step 03: An example analysis step that is executed for each subject."""
+    # Extract epochs for each subject.
+    # Problem: nur einmal ausführen??
+    for subject in subjects:
+        yield dict(
+            task_dep=['apply_ica'],
+            name=subject,
+            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py'],
+            targets=[fname.evokeds(subject=subject)],
+            actions=['python 03_make_evoked.py %s' % subject],
         )
 
 # # Here is another example task that averages across subjects.

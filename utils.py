@@ -4,11 +4,11 @@ import mne
 import numpy as np
 import pandas as pd
 from scipy import linalg
-from config import fname, bids_root
+from config import fname, bids_root, task
 from mne_bids.read import _from_tsv,_drop
 from mne_bids import (BIDSPath, read_raw_bids)
 
-def import_data(subject, task):
+def import_raw(subject, task):
     bids_path = BIDSPath(subject=subject,
                      task=task,
                      session=task,
@@ -26,6 +26,7 @@ def import_data(subject, task):
     raw.load_data()
 
     # Add channel locations
+    # Problem: Wieso?
     raw.drop_channels(['HEOG_left', 'HEOG_right', 'VEOG_lower'])
     raw.set_montage('standard_1020',match_case=False)
 
@@ -95,11 +96,11 @@ def load_precomputed_ica(subject):
     # ica = mne.preprocessing.read_ica_eeglab(fn +'.set')
 
     # I have to use this, because the montage is first set before it is subsetted. Thereby it requires chaninfo for all channels, not only the channels used i ICA...
-    ica = sp_read_ica_eeglab(fname.precomputed_ica_set(subject=subject))
+    ica = sp_read_ica_eeglab(fname.precomputed_ica_set(subject=subject, task=task))
     # Potentially for plotting one might want to copy over the raw.info, but in this function we dont have access / dont want to load it
     # ica.info = raw.info
     ica._update_ica_names()
-    badComps = np.loadtxt(fname.precomputed_ica_tsv(subject=subject),delimiter="\t")
+    badComps = np.loadtxt(fname.precomputed_ica_tsv(subject=subject, task=task),delimiter="\t")
     badComps -= 1 # start counting at 0
     
     # if only a single component is in the file, we get an error here because it is an ndarray with n-dim = 0.

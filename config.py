@@ -9,7 +9,6 @@ Configuration parameters for the study.
 import os
 import getpass
 from socket import getfqdn
-from typing import Optional
 
 from numpy import NaN
 from fnames import FileNames
@@ -54,14 +53,14 @@ subjects = ['001', '002', '003']
 
 
 ###############################################################################
-# Frequency filtering
-h_freq = 0.5
-l_freq = 50
-h_trans_bandwidth = None
-l_trans_bandwidth = None
+# FREQUENCY FILTERING
+l_freq = 0.5
+h_freq = 50.0
+
+analyze_channel_filtering = 'Pz'
 
 ###############################################################################
-# Epoching
+# EPOCHING
 conditions = ['stimulus']
 epochs_metadata_tmin = -0.1
 """
@@ -75,8 +74,29 @@ epochs_metadata_tmax = 1
 Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
 window for metadata generation.
 """
-
 eeg_reference = 'average'
+
+analyze_channel_epoching = 'Pz'
+
+###############################################################################
+# DECODING
+
+condition_1 = ""
+condition_2 = ""
+analyze_channels = ['Cz']
+
+decoding_n_splits: int = 5
+"""
+The number of folds (also called "splits") to use in the cross-validation scheme.
+"""
+
+random_state = 42
+"""
+You can specify the seed of the random number generator (RNG).
+This setting is passed to the ICA algorithm and to the decoding function,
+ensuring reproducible results. Set to ``None`` to avoid setting the RNG
+to a defined state.
+"""
 
 ###############################################################################
 # Templates for filenames
@@ -92,15 +112,18 @@ fname.add('processed_data_dir', './processed')
 fname.add('figures_dir', './figures')
 
 # The data files that are used by the analysis steps
-fname.add('precomputed_ica_tsv', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_ica.tsv')
-fname.add('precomputed_ica_set', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_ica.set')
-fname.add('precomputed_badChannels', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_badChannels.tsv')
-fname.add('precomputed_badSegments', '{raw_data_dir}/{task}/sub-{subject:03d}/ses-{task}/eeg/sub-{subject:03d}_ses-{task}_task-{task}_badSegments.csv')
+fname.add('events', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_events.tsv')
+fname.add('precomputed_ica_tsv', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_ica.tsv')
+fname.add('precomputed_ica_set', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_ica.set')
+fname.add('precomputed_badChannels', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_badChannels.tsv')
+fname.add('precomputed_badSegments', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_badSegments.csv')
 
 # The data files that are produced by the analysis steps
-fname.add('filtering', '{processed_data_dir}/filtered-{subject}.fif')
-fname.add('epoching', '{processed_data_dir}/epochs-{subject}.fif')
-fname.add('cleaned_epochs', '{processed_data_dir}/cleaned_epochs.fif')
+fname.add('filtering', '{processed_data_dir}/{subject}-filtered-raw.fif')
+fname.add('epoching', '{processed_data_dir}/{subject}-epo.fif')
+fname.add('cleaned_epochs', '{processed_data_dir}/{subject}-cleaned-epo.fif')
+fname.add('evokeds', '{processed_data_dir}/{subject}-ave.fif')
+fname.add('decoding', '{processed_data_dir}/{subject}-decoding.fif')
 
 # The figures
 fname.add('figure1', '{figures_dir}/figure1.pdf')
