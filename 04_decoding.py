@@ -42,22 +42,28 @@ epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True
 # directly – without going through a projector.
 
 epochs.set_eeg_reference('average')
+
 # Problem: in exercise epochs.copy().crop(tmin=1., tmax=2.)
+# -> Avoid classification of active subject reactions 
+# avoid classification of evoked responses by using epochs that start 1s after
+# cue onset.
+
+
 epochs_targets = mne.concatenate_epochs([epochs[cond] for cond in cfg.targets])
 epochs_distractors = mne.concatenate_epochs([epochs[cond] for cond in cfg.distractors])
 
-epochs = mne.concatenate_epochs([epochs_targets, epochs_distractors])
-epochs_training = epochs.copy()
+# epochs = mne.concatenate_epochs([epochs_targets, epochs_distractors])
+# epochs_training = epochs.copy()
 
-n_cond1 = len(epochs_targets)
-n_cond2 = len(epochs_distractors)
+# n_cond1 = len(epochs_targets)
+# n_cond2 = len(epochs_distractors)
 
-X = epochs_training.get_data()
-labels = np.r_[np.ones(n_cond1), np.zeros(n_cond2)]
+# X = epochs_training.get_data()
+# labels = np.r_[np.ones(n_cond1), np.zeros(n_cond2)]
 
-csp = mne.decoding.CSP(n_components=2)
-csp.fit_transform(epochs.get_data(), labels)
-csp_data = csp.transform(epochs.get_data())
+# csp = mne.decoding.CSP(n_components=2)
+# csp.fit_transform(epochs.get_data(), labels)
+# csp_data = csp.transform(epochs.get_data())
 
 
 # # Eigener sliding estimator
@@ -89,14 +95,26 @@ csp_data = csp.transform(epochs.get_data())
 
 # Add a plot of the data to the HTML report
 with mne.open_report(cfg.fname.report(subject=subject)) as report:
-    fig1 = plt.figure()
-    epochs_viz = epochs.get_data(picks=['C3','C4']).mean(axis=2)
-    plt.scatter(epochs_viz[:,0],epochs_viz[:,1],color=np.array(["red","green"])[labels.astype(int)])
-    report.add_figure(fig1,'Intial data for '+ cfg.plot_channel_filtering, replace=True)
+    
+    report.add_epochs(epochs_targets, 'Targets', psd=False )
+    report.add_epochs(epochs_distractors, 'Distractors',psd=False)
 
-    fig2 = plt.figure()
-    plt.scatter(csp_data[:,0],csp_data[:,1],color=np.array(["red","green"])[labels.astype(int)])
-    report.add_figure(fig2,'CSP data for '+ cfg.plot_channel_filtering, replace=True)
+    # Compare ERPs of targets and distractors
+    channels = ['Fz', 'C3', 'Cz', 'C4', 'Pz', 'P3', 'P4']
+    fig2 = mne.viz.plot_compare_evokeds({'Target': epochs_targets.average(),
+                                            'Distractor': epochs_distractors.average()},
+                                            picks=channels,
+                                            show=False)
+    report.add_figure(fig2,'Comparison of concatenated ERPs (target - distractor) of ' + str(channels), replace=True)
+
+    # fig1 = plt.figure()
+    # epochs_viz = epochs.get_data(picks=['C3','C4']).mean(axis=2)
+    # plt.scatter(epochs_viz[:,0],epochs_viz[:,1],color=np.array(["red","green"])[labels.astype(int)])
+    # report.add_figure(fig1,'Intial data for '+ cfg.plot_channel_filtering, replace=True)
+
+    # fig2 = plt.figure()
+    # plt.scatter(csp_data[:,0],csp_data[:,1],color=np.array(["red","green"])[labels.astype(int)])
+    # report.add_figure(fig2,'CSP data for '+ cfg.plot_channel_filtering, replace=True)
 
     # fig2 = plt.figure()
     # plt.plot(timeVec,t_scores,'o-')

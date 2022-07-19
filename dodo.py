@@ -5,6 +5,7 @@ http://pydoit.org
 All the filenames are defined in config.py
 """
 from config import fname, subjects
+import os
 
 # Configuration for the "doit" tool.
 DOIT_CONFIG = dict(
@@ -16,6 +17,13 @@ DOIT_CONFIG = dict(
     # defined in this file, instead of alphabetically.
     sort='definition',
 )
+
+def task_delete_reports():
+    """Delete all files in the report directory. Use with caution!"""
+    return dict(
+        file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py', '04_decoding.py'],
+        actions=['python delete_reports.py']
+    )
 
 def task_check():
     """Check the system dependencies."""
