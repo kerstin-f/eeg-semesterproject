@@ -9,31 +9,30 @@ import mne
 import numpy as np
 import pandas as pd
 import mne
+import config as cfg
 
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import LogisticRegression
+import sklearn.pipeline
+import sklearn.model_selection
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from mne.decoding import Scaler, Vectorizer
 from matplotlib import pyplot as plt
-from config import fname, analyze_channels, decoding_n_splits, random_state
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('subject', metavar='sub-###', help='The subject to process')
-parser.add_argument('condition_1')
-parser.add_argument('condition_2')
 args = parser.parse_args()
 subject = args.subject
-condition_1 = args.condition_1
-condition_2 = args.condition_2
 
 print('Processing subject:', subject)
-print('Contrasting conditions:{condition1} – {condition2}')
+print('Contrasting conditions: Target – Distractor')
 
 # The evoked data sets are created by averaging different conditions.
-epochs = mne.read_epochs(fname.epochs_cleaned(subject=subject), preload=True)
+epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True)
 
 # We special-case the average reference here to work around a situation
 # where e.g. `analyze_channels` might contain only a single channel:
@@ -43,44 +42,65 @@ epochs = mne.read_epochs(fname.epochs_cleaned(subject=subject), preload=True)
 # directly – without going through a projector.
 
 epochs.set_eeg_reference('average')
-epochs.pick(analyze_channels)
+# Problem: in exercise epochs.copy().crop(tmin=1., tmax=2.)
+epochs_targets = mne.concatenate_epochs([epochs[cond] for cond in cfg.targets])
+epochs_distractors = mne.concatenate_epochs([epochs[cond] for cond in cfg.distractors])
 
-epochs_conds = [condition_1, condition_2]
+epochs = mne.concatenate_epochs([epochs_targets, epochs_distractors])
+epochs_training = epochs.copy()
 
-# Problem: 01_make_epoching.py does not differentiates different conditions
-epochs = mne.concatenate_epochs([epochs[epochs_conds[0]],epochs[epochs_conds[1]]])
+n_cond1 = len(epochs_targets)
+n_cond2 = len(epochs_distractors)
 
-n_cond1 = len(epochs[epochs_conds[0]])
-n_cond2 = len(epochs[epochs_conds[1]])
+X = epochs_training.get_data()
+labels = np.r_[np.ones(n_cond1), np.zeros(n_cond2)]
 
-X = epochs.get_data()
-y = np.r_[np.ones(n_cond1), np.zeros(n_cond2)]
+csp = mne.decoding.CSP(n_components=2)
+csp.fit_transform(epochs.get_data(), labels)
+csp_data = csp.transform(epochs.get_data())
 
-classification_pipeline = make_pipeline(
-    Scaler(scalings='mean'),
-    Vectorizer(),
-+   LogisticRegression(
-        solver='liblinear',  # much faster than the default
-        random_state=random_state,
-        n_jobs=1,
-    )
-)
 
-# Run the classification, and evaluate it via a cross-validation procedure.
-cv = StratifiedKFold(
-    shuffle=True,
-    random_state=random_state,
-    n_splits=decoding_n_splits,
-)
-scores = cross_val_score(
-    estimator=classification_pipeline,
-    X=X,
-    y=y,
-    cv=cv,
-    scoring='roc_auc',
-    n_jobs=1
-)
+# # Eigener sliding estimator
+# lda = LinearDiscriminantAnalysis()
+# csp = mne.decoding.CSP(n_components=2)
+# pipe = sklearn.pipeline.Pipeline([('CSP', csp), ('LDA', lda)])
+# w_size = 1
+# timeVec = epochs.copy().resample(40).times
+# timeVec = timeVec[::10]
+# t_scores = np.zeros(len(timeVec))
+# for t, w_time in enumerate(timeVec):
+#         print("{}/{}".format(t,len(timeVec)))
+#         # Center the min and max of the window
+#         w_tmin = w_time - w_size / 2.
+#         w_tmax = w_time + w_size / 2.
+
+#         # stop the program if the timewindow is outside of our epoch
+#         if w_tmin < timeVec[0]:
+#             continue
+#         if w_tmax > timeVec[len(timeVec)-1]:
+#             continue
+#         # Crop data into time-window of interest
+#         X = epochs.copy().resample(40).crop(w_tmin, w_tmax).get_data()
+
+#         # Save mean scores over folds for each frequency and time window
+#         t_scores[t] = np.mean( sklearn.model_selection.cross_val_score(estimator=pipe, X=X, y=labels,
+#                                                      scoring='roc_auc', cv=2,
+#                                                      n_jobs=1), axis=0)
 
 # Add a plot of the data to the HTML report
-with mne.open_report(fname.report(subject=subject)) as report:
-    report.save(fname.report_html(subject=subject), overwrite=True, open_browser=False)
+with mne.open_report(cfg.fname.report(subject=subject)) as report:
+    fig1 = plt.figure()
+    epochs_viz = epochs.get_data(picks=['C3','C4']).mean(axis=2)
+    plt.scatter(epochs_viz[:,0],epochs_viz[:,1],color=np.array(["red","green"])[labels.astype(int)])
+    report.add_figure(fig1,'Intial data for '+ cfg.plot_channel_filtering, replace=True)
+
+    fig2 = plt.figure()
+    plt.scatter(csp_data[:,0],csp_data[:,1],color=np.array(["red","green"])[labels.astype(int)])
+    report.add_figure(fig2,'CSP data for '+ cfg.plot_channel_filtering, replace=True)
+
+    # fig2 = plt.figure()
+    # plt.plot(timeVec,t_scores,'o-')
+    # plt.hlines(0.5,-1,4,'k')
+    # report.add_figure(fig2,'Mean scores over folds for each frequency and time window', replace=True)
+    
+    report.save(cfg.fname.report_html(subject=subject), overwrite=True, open_browser=False)

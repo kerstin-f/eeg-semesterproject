@@ -1,12 +1,14 @@
-
-import os
 import mne
 import numpy as np
 import pandas as pd
+import config as cfg
+
 from scipy import linalg
-from config import fname, bids_root, task
+from pprint import pprint
+from logging import warn
 from mne_bids.read import _from_tsv,_drop
 from mne_bids import (BIDSPath, read_raw_bids)
+from scipy.stats.mstats import winsorize
 
 def import_raw(subject, task):
     bids_path = BIDSPath(subject=subject,
@@ -14,12 +16,12 @@ def import_raw(subject, task):
                      session=task,
                      datatype='eeg', 
                      suffix='eeg',
-                     root=bids_root)
+                     root=cfg.bids_root)
     
     # read_raw_bids automatically
     raw = read_raw_bids(bids_path=bids_path)
     # Fix the annotations reading
-    _read_annotations_core(bids_path,raw)
+    _handle_events_reading_core(subject,raw)
 
     # Missing: _crop_data(cfg, raw, subject): Crop the data to the desired duration.
 
@@ -33,19 +35,25 @@ def import_raw(subject, task):
     # Missing: _drop_channels_func(cfg, raw, subject, session): Drop channels from the data.
     # Missing: _fix_stim_artifact_func(cfg: SimpleNamespace,raw: mne.io.BaseRaw): Fix stimulation artifact in the data.
     # Not required (?): _find_bad_channels(cfg=cfg, raw=raw, subject=subject, session=session,task=get_task(), run=run): Find and mark bad MEG channels.
-
     return raw
 
+def read_event_keys_from_json():
+    df = pd.read_json(cfg.fname.event_code_values(task=cfg.task), 'Levels')
+    evts_codes = dict(df['value'][0])
+    evts_desc = {}
+    # Key: events, Value: description
+    # (e.g. 'stimulus:11': 'block target A, trial stimulus A')
+    for v in evts_codes.items():
+        desc = v[1].split(' - ')
+        evts_desc[str.lower(desc[0]) + ':' + v[0]] = desc[1]
+    return evts_desc
 
-def _read_annotations_core(bids_path,raw):
-    tsv=os.path.join(bids_path.directory,bids_path.update(suffix="events",extension=".tsv").basename)
-    _handle_events_reading_core(tsv,raw)
 
-def _handle_events_reading_core(events_fname, raw):
+def _handle_events_reading_core(subject, raw):
     """Read associated events.tsv and populate raw.
     Handle onset, duration, and description of each event.
     """
-    events_dict = _from_tsv(events_fname)
+    events_dict = _from_tsv(cfg.fname.events(subject=subject, task=cfg.task))
 
     if ('value' in events_dict) and ('trial_type' in events_dict):
         events_dict = _drop(events_dict, 'n/a', 'trial_type')
@@ -96,11 +104,11 @@ def load_precomputed_ica(subject):
     # ica = mne.preprocessing.read_ica_eeglab(fn +'.set')
 
     # I have to use this, because the montage is first set before it is subsetted. Thereby it requires chaninfo for all channels, not only the channels used i ICA...
-    ica = sp_read_ica_eeglab(fname.precomputed_ica_set(subject=subject, task=task))
+    ica = sp_read_ica_eeglab(cfg.fname.precomputed_ica_set(subject=subject, task=cfg.task))
     # Potentially for plotting one might want to copy over the raw.info, but in this function we dont have access / dont want to load it
     # ica.info = raw.info
     ica._update_ica_names()
-    badComps = np.loadtxt(fname.precomputed_ica_tsv(subject=subject, task=task),delimiter="\t")
+    badComps = np.loadtxt(cfg.fname.precomputed_ica_tsv(subject=subject, task=cfg.task),delimiter="\t")
     badComps -= 1 # start counting at 0
     
     # if only a single component is in the file, we get an error here because it is an ndarray with n-dim = 0.
@@ -122,10 +130,10 @@ def add_ica_info(raw, ica):
 
 def load_precomputed_badData(subject):
     # return precomputed annotations and bad channels (first channel = 0)
-    tmp = pd.read_csv(fname.precomputed_badSegments(subject=subject))
+    tmp = pd.read_csv(cfg.fname.precomputed_badSegments(subject=subject, task=cfg.task))
     annotations = mne.Annotations(tmp.onset, tmp.duration, tmp.description)
     # Unfortunately MNE assumes that csv files are in milliseconds and only txt files in seconds.. wth?
-    badChannels = np.loadtxt(fname.precomputed_badChannels(subject=subject), delimiter='\t')
+    badChannels = np.loadtxt(cfg.fname.precomputed_badChannels(subject=subject, task=cfg.task), delimiter='\t')
     badChannels = badChannels.astype(int)
     badChannels -= 1 # start counting at 0
     return annotations, badChannels
@@ -194,3 +202,9 @@ def sp_read_ica_eeglab(fname, *, verbose=None):
     ica._update_mixing_matrix()
     ica._update_ica_names()
     return ica
+
+# Callback for averaging epochs
+def winsor(d):
+    return np.mean(winsorize(d,axis=0,limits=(0.2,0.2)),axis=0)
+def median(d):
+    return np.median(d,axis=0)

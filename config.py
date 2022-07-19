@@ -49,7 +49,7 @@ task = "p3"
 # 			count = count + 1
 # subjects = ["%.3d" % i for i in range(1,count+1)]
 
-subjects = ['001', '002', '003']
+subjects = ['002']
 
 
 ###############################################################################
@@ -57,32 +57,35 @@ subjects = ['001', '002', '003']
 l_freq = 0.5
 h_freq = 50.0
 
-analyze_channel_filtering = 'Pz'
+plot_channel_filtering = 'Pz'
 
 ###############################################################################
 # EPOCHING
 conditions = ['stimulus']
-epochs_metadata_tmin = -0.1
+epochs_tmin = -0.1
 """
 The beginning of the time window for metadata generation, in seconds,
 relative to the time-locked event of the respective epoch. This may be less
 than or larger than the epoch's first time point. If ``None``, use the first
 time point of the epoch.
 """
-epochs_metadata_tmax = 1
+epochs_tmax = 1
 """
 Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
 window for metadata generation.
 """
 eeg_reference = 'average'
 
-analyze_channel_epoching = 'Pz'
+plot_channel_epoching = 'Pz'
 
 ###############################################################################
 # DECODING
 
-condition_1 = ""
-condition_2 = ""
+# Task P3
+targets = ['stimulus:11', 'stimulus:22', 'stimulus:33', 'stimulus:44', 'stimulus:55']
+distractors = ['stimulus:12', 'stimulus:23', 'stimulus:34', 'stimulus:41', 'stimulus:53']
+
+
 analyze_channels = ['Cz']
 
 decoding_n_splits: int = 5
@@ -113,6 +116,7 @@ fname.add('figures_dir', './figures')
 
 # The data files that are used by the analysis steps
 fname.add('events', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_events.tsv')
+fname.add('event_code_values', '{raw_data_dir}/{task}/task-{task}_events.json')
 fname.add('precomputed_ica_tsv', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_ica.tsv')
 fname.add('precomputed_ica_set', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_ica.set')
 fname.add('precomputed_badChannels', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_badChannels.tsv')

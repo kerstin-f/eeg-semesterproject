@@ -25,7 +25,6 @@ def task_check():
         actions=['python check_system.py']
     )
 
-
 # This example task executes a single analysis script for each subject, giving
 # the subject as a command line parameter to the script.
 def task_filtering():
@@ -86,6 +85,19 @@ def task_make_evoked():
             file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py'],
             targets=[fname.evokeds(subject=subject)],
             actions=['python 03_make_evoked.py %s' % subject],
+        )
+
+def task_decoding():
+    """Step 03: An example analysis step that is executed for each subject."""
+    # Extract epochs for each subject.
+    # Problem: nur einmal ausführen??
+    for subject in subjects:
+        yield dict(
+            task_dep=['make_evoked'],
+            name=subject,
+            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py', '04_decoding.py'],
+            targets=[],
+            actions=['python 04_decoding.py %s' % subject],
         )
 
 # # Here is another example task that averages across subjects.
