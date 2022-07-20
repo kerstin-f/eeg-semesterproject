@@ -40,6 +40,7 @@ os.environ['OMP_NUM_THREADS'] = str(n_jobs)
 
 bids_root = "./data/p3/"
 task = "p3" 
+analyze_channels = ['Cz']
 
 # # All subjects from 1 to N
 # count = 0
@@ -61,7 +62,8 @@ plot_channel_filtering = 'Pz'
 
 ###############################################################################
 # EPOCHING
-conditions = ['stimulus']
+
+# time relative to each event at which to start and end each epoch
 epochs_tmin = -0.1
 """
 The beginning of the time window for metadata generation, in seconds,
@@ -74,7 +76,6 @@ epochs_tmax = 1
 Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
 window for metadata generation.
 """
-eeg_reference = 'average'
 
 plot_channel_epoching = 'Pz'
 
@@ -84,9 +85,6 @@ plot_channel_epoching = 'Pz'
 # Task P3
 targets = ['stimulus:11', 'stimulus:22', 'stimulus:33', 'stimulus:44', 'stimulus:55']
 distractors = ['stimulus:12', 'stimulus:23', 'stimulus:34', 'stimulus:41', 'stimulus:53']
-
-
-analyze_channels = ['Cz']
 
 decoding_n_splits: int = 5
 """

@@ -7,6 +7,7 @@ import utils
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from scipy import signal
 
 # All parameters are defined in config.py
 import config as cfg
@@ -18,74 +19,68 @@ args = parser.parse_args()
 subject = args.subject
 print('Processing subject:', subject)
 
-
 # Load the data, filter it and save the result
 raw = utils.import_raw(subject, cfg.task)
-# raw.load_data()
-
-if cfg.l_freq is not None and cfg.h_freq is None:
-    msg = (f'High-pass filtering EEG data; lower bound: 'f'{cfg.l_freq} Hz')
-elif cfg.l_freq is None and cfg.h_freq is not None:
-    msg = (f'Low-pass filtering EEG data; upper bound: 'f'{cfg.h_freq} Hz')
-elif cfg.l_freq is not None and cfg.h_freq is not None:
-    msg = (f'Band-pass filtering EEG data; range: 'f'{cfg.l_freq} – {cfg.h_freq} Hz')
-else:
-    msg = (f'Not applying frequency filtering to EEG data.')
-
-raw_filtered = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin')
 
 # Account for precomputed bad data
-# Missing: Report badData
 # https://mne.tools/dev/auto_tutorials/preprocessing/15_handling_bad_channels.html
 badAnnotations, badChannels = utils.load_precomputed_badData(subject)
-raw_filtered.annotations.append(badAnnotations.onset,badAnnotations.duration,badAnnotations.description)
-raw_filtered.info['bads'].extend(badChannels)
-raw_filtered.interpolate_bads()
+raw.annotations.append(badAnnotations.onset,badAnnotations.duration,badAnnotations.description)
+raw.info['bads'].extend(badChannels)
+raw.interpolate_bads(reset_bads=False)
 
-raw_filtered.save(cfg.fname.filtering(subject=subject), overwrite=True)
+# Set an EEG reference
+raw.set_eeg_reference('average', projection=True)
 
-# Missing: Resample (directly after filtering)
-# Missing: Rereference? (=> see 01_epoching.py)
+# Apply frequency filtering
+raw_filtered_acausal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='zero')
+raw_filtered_causal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='minimum')
+
+raw_filtered_acausal.save(cfg.fname.filtering(subject=subject), overwrite=True)
+
+# Missing: Rereference? (=> see 01_make_epochs.py)
 
 # Add a plot of the data to the HTML report
 with mne.open_report(cfg.fname.report(subject=subject)) as report:
     report.title = 'Results for subject ' + subject
-    report.add_raw(raw=raw, title='Raw', psd=False, replace=True)
+    report.add_raw(raw=raw, title='Raw', psd=False, butterfly=False, replace=True)
 
-    # Plot events
-    # Missing: use sampling frequency from raw.info['sfreq']?
+    # Plot impulse response function
+    fig1 = plt.figure()
+    imp = signal.unit_impulse(100, 'mid')
+    impulse_response = mne.filter.filter_data(imp,sfreq=raw.info['sfreq'],l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin')
+    plt.plot(np.arange(-50, 50), imp)
+    plt.plot(np.arange(-50, 50), impulse_response)
+    plt.xlabel('Time [samples]')
+    plt.ylabel('Amplitude')
+    report.add_figure(fig1,'FIR filter impulse response function', replace=True)
 
-    # df = pd.read_csv(cfg.fname.events(subject=subject, task=cfg.task), delimiter='\t')
-    # stim = df[df.trial_type == 'stimulus']
-    # res = df[df.trial_type == 'response']
-    # fig1 = plt.figure()
-    # plt.scatter(stim.onset, stim.trial_type, marker='o', c='green')
-    # plt.scatter(res.onset, res.trial_type, marker='o', c='red')
-    # report.add_figure(fig1,'Events from events.tsv', replace=True)
-
-    # Plots for the plot_channel set in config file
+    # Subselect channel of interest based on setting in config file
     raw_subselect = raw.copy().pick_channels([cfg.plot_channel_filtering])
-    raw_filtered_subselect = raw_filtered.copy().pick_channels([cfg.plot_channel_filtering])
-
-    # Plot raw: extract a single channel and plot the whole timeseries
-    # Problem: fehlender Plot??
-    fig2 = plt.figure()
-    plt.plot(raw=raw_subselect[:,:][0].T, show=False)
-    report.add_figure(fig2,'Whole timeseries of channel '+ cfg.plot_channel_filtering, replace=True)
-    
+    raw_filtered_subselect_acausal = raw_filtered_acausal.copy().pick_channels([cfg.plot_channel_filtering])
+    raw_filtered_subselect_causal = raw_filtered_causal.copy().pick_channels([cfg.plot_channel_filtering])
+ 
     # Plot raw psd
     fig3 = raw_subselect.plot_psd(area_mode='range', tmax=10.0, average=False, xscale="linear", show=False)
     report.add_figure(fig3,'Power spectral density of channel ' + cfg.plot_channel_filtering + ' (xscale = linear)', replace=True)
     
     # Plot raw_filtered psd
-    fig4 = raw_filtered_subselect.plot_psd(area_mode='range', tmax=10.0, average=False, xscale="log", show=False)
+    fig4 = raw_filtered_subselect_acausal.plot_psd(area_mode='range', tmax=10.0, average=False, xscale="log", show=False)
     report.add_figure(fig4,'Power spectral density of filtered channel ' + cfg.plot_channel_filtering + ' (xscale = log)', replace=True)
 
     # Compare raw and raw_filtered
     fig4 = plt.figure()
     plt.plot(raw_subselect[:,0:1000][0].T-np.median(raw_subselect[:,0:1000][0].T), label="raw")
-    plt.plot(raw_filtered_subselect[:,0:1000][0].T-np.median(raw_filtered_subselect[:,0:1000][0].T), label="filtered")
+    plt.plot(raw_filtered_subselect_acausal[:,0:1000][0].T-np.mean(raw_filtered_subselect_acausal[:,0:1000][0].T), label="filtered")
     plt.legend(loc="upper left")
     report.add_figure(fig4,'Comparison of raw and filtered channel ' + cfg.plot_channel_filtering, replace=True)
+
+    # Compare raw filtered by acausal and causal filters
+    fig5 = plt.figure()
+    plt.plot(raw_subselect[:,0:1000][0].T-np.median(raw_subselect[:,0:1000][0].T), label="raw")
+    plt.plot(raw_filtered_subselect_acausal[:,0:1000][0].T-np.median(raw_filtered_subselect_acausal[:,0:1000][0].T), label="acausal")
+    plt.plot(raw_filtered_subselect_causal[:,0:1000][0].T-np.mean(raw_filtered_subselect_causal[:,0:1000][0].T), label="causal")
+    plt.legend(loc="upper left")
+    report.add_figure(fig5,'Comparison of acausal and causal filtering result of filtered channel ' + cfg.plot_channel_filtering, replace=True)
 
     report.save(cfg.fname.report_html(subject=subject), overwrite=True, open_browser=False)

@@ -17,10 +17,6 @@ print('Processing subject:', subject)
 
 epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True)
 
-# You can also pool conditions by passing multiple tags as a list
-# epochs[['right', 'bottom']]
-# To change the temporal extent of the Epochs, you can use the crop() method
-
 # Missing: Comparison
 # 'robust':epochs.load_data().average(method=utils.winsor),
 # 'median':epochs.load_data().average(method=utils.median)

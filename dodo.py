@@ -21,7 +21,7 @@ DOIT_CONFIG = dict(
 def task_delete_reports():
     """Delete all files in the report directory. Use with caution!"""
     return dict(
-        file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py', '04_decoding.py'],
+        file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py', '05_decoding.py'],
         actions=['python delete_reports.py']
     )
 
@@ -58,16 +58,16 @@ def task_filtering():
             actions=['python 00_filtering.py %s' % subject],
         )
 
-def task_epoching():
+def task_make_epochs():
     """Step 01: An example analysis step that is executed for each subject."""
     # Extract epochs for each subject.
     for subject in subjects:
         yield dict(
             task_dep=['filtering'],
             name=subject,
-            file_dep=['00_filtering.py', '01_epoching.py'],
+            file_dep=['00_filtering.py', '01_make_epochs.py'],
             targets=[fname.epoching(subject=subject)],
-            actions=['python 01_epoching.py %s' % subject],
+            actions=['python 01_make_epochs.py %s' % subject],
         )
 
 def task_apply_ica():
@@ -75,9 +75,9 @@ def task_apply_ica():
     # Extract epochs for each subject.
     for subject in subjects:
         yield dict(
-            task_dep=['epoching'],
+            task_dep=['make_epochs'],
             name=subject,
-            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py'],
+            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py'],
             targets=[fname.cleaned_epochs(subject=subject)],
             actions=['python 02_apply_ica.py %s' % subject],
         )
@@ -90,7 +90,7 @@ def task_make_evoked():
         yield dict(
             task_dep=['apply_ica'],
             name=subject,
-            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py'],
+            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py'],
             targets=[fname.evokeds(subject=subject)],
             actions=['python 03_make_evoked.py %s' % subject],
         )
@@ -103,36 +103,7 @@ def task_decoding():
         yield dict(
             task_dep=['make_evoked'],
             name=subject,
-            file_dep=['00_filtering.py', '01_epoching.py', '02_apply_ica.py', '03_make_evoked.py', '04_decoding.py'],
+            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py', '05_decoding.py'],
             targets=[],
-            actions=['python 04_decoding.py %s' % subject],
+            actions=['python 05_decoding.py %s' % subject],
         )
-
-# # Here is another example task that averages across subjects.
-# def task_example_summary():
-#     """Step 01: Average across subjects."""
-#     return dict(
-#         task_dep=['example_step'],  # This task should come after `task_example_step`
-#         file_dep=[fname.output(subject=s) for s in subjects] + ['01_grand_average.py'],
-#         targets=[fname.grand_average],
-#         actions=['python 01_grand_average.py'],
-#     )
-
-
-# def task_figures():
-#     """Make all figures. Each figure is a sub-task."""
-#     # Make figure 1
-#     yield dict(
-#         name='figure_example1',
-#         file_dep=['figure_example1.py'],
-#         targets=[fname.figure1],
-#         actions=['python figure_example1.py'],
-#     )
-
-#     # Make figure 2
-#     yield dict(
-#         name='figure_grand_average',
-#         file_dep=[fname.grand_average, 'figure_grand_average.py'],
-#         targets=[fname.figure_grand_average],
-#         actions=['python figure_grand_average.py'],
-#     )
