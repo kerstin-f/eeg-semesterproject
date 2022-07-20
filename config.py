@@ -8,28 +8,14 @@ Configuration parameters for the study.
 
 import os
 import getpass
-from socket import getfqdn
+#from socket import getfqdn
 
 from numpy import NaN
 from fnames import FileNames
 
-
-###############################################################################
-# Determine which user is running the scripts on which machine and set the path
-# where the data is stored and how many CPU cores to use.
-
-user = getpass.getuser()  # Username of the user running the scripts
-host = getfqdn()  # Hostname of the machine running the scripts
-
-# You want to add your machine to this list
-if user == 'kerst':
-    # My laptop
-    raw_data_dir = './data'
-    n_jobs = 1
-else:
-    # Defaults
-    raw_data_dir = './data'
-    n_jobs = 1
+# My laptop
+raw_data_dir = './data'
+n_jobs = 1
 
 # For BLAS to use the right amount of cores
 os.environ['OMP_NUM_THREADS'] = str(n_jobs)
@@ -40,7 +26,7 @@ os.environ['OMP_NUM_THREADS'] = str(n_jobs)
 
 bids_root = "./data/p3/"
 task = "p3" 
-analyze_channels = ['Cz']
+analyze_channels = ['Fz', 'C3', 'Cz', 'C4', 'Pz', 'P3', 'P4']
 
 # # All subjects from 1 to N
 # count = 0
@@ -84,7 +70,8 @@ plot_channel_epoching = 'Pz'
 
 # Task P3
 targets = ['stimulus:11', 'stimulus:22', 'stimulus:33', 'stimulus:44', 'stimulus:55']
-distractors = ['stimulus:12', 'stimulus:23', 'stimulus:34', 'stimulus:41', 'stimulus:53']
+distractors = ['stimulus:21', 'stimulus:31', 'stimulus:41', 'stimulus:51', 'stimulus:12', 'stimulus:32', 'stimulus:42', 'stimulus:52', 'stimulus:13', 'stimulus:23',
+               'stimulus:43', 'stimulus:53', 'stimulus:14', 'stimulus:24', 'stimulus:34', 'stimulus:54', 'stimulus:15', 'stimulus:25', 'stimulus:35', 'stimulus:45']
 
 decoding_n_splits: int = 5
 """

@@ -7,17 +7,16 @@ which condition.
 import argparse
 import mne
 import numpy as np
-import pandas as pd
-import mne
+#import pandas as pd
 import config as cfg
 
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedKFold
-from sklearn.linear_model import LogisticRegression
-import sklearn.pipeline
-import sklearn.model_selection
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+# from sklearn.model_selection import cross_val_score
+# from sklearn.pipeline import make_pipeline
+# from sklearn.model_selection import StratifiedKFold
+# from sklearn.linear_model import LogisticRegression
+# import sklearn.pipeline
+# import sklearn.model_selection
+# from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from mne.decoding import Scaler, Vectorizer
 from matplotlib import pyplot as plt
@@ -33,6 +32,10 @@ print('Contrasting conditions: Target – Distractor')
 
 # The evoked data sets are created by averaging different conditions.
 epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True)
+epochs.set_eeg_reference('average')
+
+# Problem: When to pick channels? Not here...
+# epochs.pick_channels(cfg.analyze_channels)
 
 # We special-case the average reference here to work around a situation
 # where e.g. `analyze_channels` might contain only a single channel:
@@ -41,31 +44,33 @@ epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True
 # average reference projection here, and applying the average reference    
 # directly – without going through a projector.
 
-epochs.set_eeg_reference('average')
 
 # Problem: in exercise epochs.copy().crop(tmin=1., tmax=2.)
 # -> Avoid classification of active subject reactions 
 # avoid classification of evoked responses by using epochs that start 1s after
 # cue onset.
 
+epochs_combined = mne.epochs.combine_event_ids(epochs, cfg.targets, {'Targets': 0}, copy=True)
+epochs_combined = mne.epochs.combine_event_ids(epochs_combined, cfg.distractors, {'Distractors': 1}, copy=True)
+epochs_combined = epochs_combined[['Targets','Distractors']]
 
-epochs_targets = mne.concatenate_epochs([epochs[cond] for cond in cfg.targets])
-epochs_distractors = mne.concatenate_epochs([epochs[cond] for cond in cfg.distractors])
+epochs_targets = epochs_combined['Targets']
+epochs_distractors = epochs_combined['Distractors']
 
-# epochs = mne.concatenate_epochs([epochs_targets, epochs_distractors])
-# epochs_training = epochs.copy()
+# Problem: crop or not?
+#epochs_combined.crop(tmin=0., tmax=1.)
 
-# n_cond1 = len(epochs_targets)
-# n_cond2 = len(epochs_distractors)
+X = epochs_combined.get_data()
+labels =[0]*len(epochs_targets)+[1]*len(epochs_distractors)
 
-# X = epochs_training.get_data()
-# labels = np.r_[np.ones(n_cond1), np.zeros(n_cond2)]
+data = epochs_combined.get_data()
+print(data.shape)
 
-# csp = mne.decoding.CSP(n_components=2)
-# csp.fit_transform(epochs.get_data(), labels)
-# csp_data = csp.transform(epochs.get_data())
+csp = mne.decoding.CSP(n_components=2)
+csp.fit_transform(epochs_combined.get_data(), labels)
+csp_data = csp.transform(epochs_combined.get_data())
 
-
+exit()
 # # Eigener sliding estimator
 # lda = LinearDiscriminantAnalysis()
 # csp = mne.decoding.CSP(n_components=2)
@@ -98,9 +103,11 @@ with mne.open_report(cfg.fname.report(subject=subject)) as report:
     
     report.add_epochs(epochs_targets, 'Targets', psd=False )
     report.add_epochs(epochs_distractors, 'Distractors',psd=False)
+    report.add_epochs(epochs, 'epochs',psd=False)
+    report.add_epochs(epochs_combined, 'epochs_combined',psd=False)
+
 
     # Compare ERPs of targets and distractors
-    channels = ['Fz', 'C3', 'Cz', 'C4', 'Pz', 'P3', 'P4']
     fig2 = mne.viz.plot_compare_evokeds({'Target': epochs_targets.average(),
                                             'Distractor': epochs_distractors.average()},
                                             picks=channels,
