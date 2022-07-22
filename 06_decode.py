@@ -31,14 +31,13 @@ print('Processing subject:', subject)
 print('Contrasting conditions: Target – Distractor')
 
 # The evoked data sets are created by averaging different conditions.
-epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True)
-epochs.set_eeg_reference('average')
+epochs = mne.read_epochs(cfg.fname.epoched_cleaned(subject=subject), preload=True)
 
 # Problem: When to pick channels? Not here...
-# epochs.pick_channels(cfg.analyze_channels)
+# epochs.pick_channels(cfg.channels_to_analyze)
 
 # We special-case the average reference here to work around a situation
-# where e.g. `analyze_channels` might contain only a single channel:
+# where e.g. `channels_to_analyze` might contain only a single channel:
 # `concatenate_epochs` below will then fail when trying to create /
 # apply the projection. We can avoid this by removing an existing    
 # average reference projection here, and applying the average reference    
@@ -50,26 +49,22 @@ epochs.set_eeg_reference('average')
 # avoid classification of evoked responses by using epochs that start 1s after
 # cue onset.
 
-epochs_combined = mne.epochs.combine_event_ids(epochs, cfg.targets, {'Targets': 0}, copy=True)
-epochs_combined = mne.epochs.combine_event_ids(epochs_combined, cfg.distractors, {'Distractors': 1}, copy=True)
-epochs_combined = epochs_combined[['Targets','Distractors']]
-
-epochs_targets = epochs_combined['Targets']
-epochs_distractors = epochs_combined['Distractors']
+epochs_targets = epochs['Targets']
+epochs_distractors = epochs['Distractors']
 
 # Problem: crop or not?
 #epochs_combined.crop(tmin=0., tmax=1.)
 
-X = epochs_combined.get_data()
+X = epochs.get_data()
 labels =[0]*len(epochs_targets)+[1]*len(epochs_distractors)
 
-data = epochs_combined.get_data()
+data = epochs.get_data()
 print(data.shape)
 
 csp = mne.decoding.CSP(n_components=2)
-csp.fit_transform(epochs_combined.get_data(), labels)
-csp_data = csp.transform(epochs_combined.get_data())
-
+csp.fit_transform(epochs.get_data(), labels)
+csp_data = csp.transform(epochs.get_data())
+print("finished")
 exit()
 # # Eigener sliding estimator
 # lda = LinearDiscriminantAnalysis()

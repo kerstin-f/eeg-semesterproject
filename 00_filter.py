@@ -22,24 +22,14 @@ print('Processing subject:', subject)
 # Load the data, filter it and save the result
 raw = utils.import_raw(subject, cfg.task)
 
-# Account for precomputed bad data
-# https://mne.tools/dev/auto_tutorials/preprocessing/15_handling_bad_channels.html
-badAnnotations, badChannels = utils.load_precomputed_badData(subject)
-raw.annotations.append(badAnnotations.onset,badAnnotations.duration,badAnnotations.description)
-raw.info['bads'].extend(badChannels)
-raw.interpolate_bads(reset_bads=False)
-
-# Set an EEG reference
-raw.set_eeg_reference('average', projection=True)
-
 # Apply frequency filtering
 raw_filtered_acausal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='zero')
 raw_filtered_causal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='minimum')
 
-raw_filtered_acausal.save(cfg.fname.filtering(subject=subject), overwrite=True)
+raw_filtered_acausal.save(cfg.fname.filtered(subject=subject), overwrite=True)
 
 # Missing: Rereference? (=> see 01_make_epochs.py)
-
+print("test")
 # Add a plot of the data to the HTML report
 with mne.open_report(cfg.fname.report(subject=subject)) as report:
     report.title = 'Results for subject ' + subject

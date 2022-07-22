@@ -25,21 +25,21 @@ print('Processing subject:', subject)
 ica, badComps = utils.load_precomputed_ica(subject)
 
 # Problem: Wieso hier raw und nicht epochs?
-raw = mne.io.read_raw_fif(cfg.fname.filtering(subject=subject), preload=True)
+raw = mne.io.read_raw_fif(cfg.fname.filtered(subject=subject), preload=True)
 ica = utils.add_ica_info(raw, ica)
 
 # Select ICs to remove.
 ica.exclude = badComps
 
 # Load epochs to reject ICA components
-epochs = mne.read_epochs(cfg.fname.epoching(subject=subject), preload=True)
+epochs = mne.read_epochs(cfg.fname.epoched(subject=subject), preload=True)
 
 # Missing: epochs.drop_bad(cfg.ica_reject)
 
 cleaned_epochs = ica.apply(epochs.copy())
 
 # Save reconstructed epochs after ICA
-cleaned_epochs.save(cfg.fname.cleaned_epochs(subject=subject), overwrite=True)
+cleaned_epochs.save(cfg.fname.epoched_cleaned(subject=subject), overwrite=True)
 
 # Add a plot of the data to the HTML report
 with mne.open_report(cfg.fname.report(subject=subject)) as report:

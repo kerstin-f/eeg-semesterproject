@@ -26,7 +26,7 @@ os.environ['OMP_NUM_THREADS'] = str(n_jobs)
 
 bids_root = "./data/p3/"
 task = "p3" 
-analyze_channels = ['Fz', 'C3', 'Cz', 'C4', 'Pz', 'P3', 'P4']
+channels_to_analyze = ['Fz', 'C3', 'Cz', 'C4', 'Pz', 'P3', 'P4']
 
 # # All subjects from 1 to N
 # count = 0
@@ -49,7 +49,7 @@ plot_channel_filtering = 'Pz'
 ###############################################################################
 # EPOCHING
 
-# time relative to each event at which to start and end each epoch
+
 epochs_tmin = -0.1
 """
 The beginning of the time window for metadata generation, in seconds,
@@ -58,6 +58,7 @@ than or larger than the epoch's first time point. If ``None``, use the first
 time point of the epoch.
 """
 epochs_tmax = 1
+# 1
 """
 Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
 window for metadata generation.
@@ -108,11 +109,12 @@ fname.add('precomputed_badChannels', '{raw_data_dir}/{task}/sub-{subject}/ses-{t
 fname.add('precomputed_badSegments', '{raw_data_dir}/{task}/sub-{subject}/ses-{task}/eeg/sub-{subject}_ses-{task}_task-{task}_badSegments.csv')
 
 # The data files that are produced by the analysis steps
-fname.add('filtering', '{processed_data_dir}/{subject}-filtered-raw.fif')
-fname.add('epoching', '{processed_data_dir}/{subject}-epo.fif')
-fname.add('cleaned_epochs', '{processed_data_dir}/{subject}-cleaned-epo.fif')
-fname.add('evokeds', '{processed_data_dir}/{subject}-ave.fif')
-fname.add('decoding', '{processed_data_dir}/{subject}-decoding.fif')
+fname.add('filtered', '{processed_data_dir}/{subject}-filtered-raw.fif')
+fname.add('prepared', '{processed_data_dir}/{subject}-prepared-raw.fif')
+fname.add('epoched', '{processed_data_dir}/{subject}-epo.fif')
+fname.add('epoched_cleaned', '{processed_data_dir}/{subject}-cleaned-epo.fif')
+fname.add('evoked', '{processed_data_dir}/{subject}-ave.fif')
+fname.add('decoded', '{processed_data_dir}/{subject}-decoding.fif')
 
 # The figures
 fname.add('figure1', '{figures_dir}/figure1.pdf')

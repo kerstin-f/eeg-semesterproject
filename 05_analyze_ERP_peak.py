@@ -15,11 +15,7 @@ args = parser.parse_args()
 subject = args.subject
 print('Processing subject:', subject)
 
-epochs = mne.read_epochs(cfg.fname.cleaned_epochs(subject=subject), preload=True)
-
-# You can also pool conditions by passing multiple tags as a list
-# epochs[['right', 'bottom']]
-# To change the temporal extent of the Epochs, you can use the crop() method
+epochs = mne.read_epochs(cfg.fname.epoched_cleaned(subject=subject), preload=True)
 
 # Missing: Comparison
 # 'robust':epochs.load_data().average(method=utils.winsor),
@@ -32,7 +28,7 @@ for e in epochs.event_id.keys():
     all_evoked[e] = evoked
 
 evokeds = list(all_evoked.values())
-mne.write_evokeds(cfg.fname.evokeds(subject=subject), evokeds, overwrite=True)
+mne.write_evokeds(cfg.fname.evoked(subject=subject), evokeds, overwrite=True)
 
 # Problem: How to cope with condition names stimulus11, stimulus12..
 
@@ -41,7 +37,7 @@ with mne.open_report(cfg.fname.report(subject=subject)) as report:
     # Missing: add evokeds information to report
     # HERE: e.g. for subset of evokeds
     # report.add_evokeds(evokeds=evokeds)
-    for e in ['stimulus:11', 'stimulus:14']:
+    for e in epochs.event_id.keys():
         fig1 = all_evoked[e].plot(show=False, ylim=dict(eeg=(-20, 20)), spatial_colors=True)
         report.add_figure(fig1,'Evoked ' + e, replace=True)
    

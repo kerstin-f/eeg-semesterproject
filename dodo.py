@@ -21,7 +21,8 @@ DOIT_CONFIG = dict(
 def task_delete_reports():
     """Delete all files in the report directory. Use with caution!"""
     return dict(
-        file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py', '05_decoding.py'],
+        file_dep=['00_filter.py', '01_prepare_raw.py', '02_make_epochs.py', '03_apply_ica.py', 
+                '04_make_evokeds.py', '06_decode.py'],
         actions=['python delete_reports.py']
     )
 
@@ -35,7 +36,7 @@ def task_check():
 
 # This example task executes a single analysis script for each subject, giving
 # the subject as a command line parameter to the script.
-def task_filtering():
+def task_filter():
     """Step 00: An example analysis step that is executed for each subject."""
     # Run the example script for each subject in a sub-task.
     for subject in subjects:
@@ -48,14 +49,26 @@ def task_filtering():
 
             # If any of these files change, the script needs to be re-run. Make
             # sure that the script itself is part of this list!
-            file_dep=['00_filtering.py'],
+            file_dep=['00_filter.py'],
 
             # The files produced by the script
-            targets=[fname.filtering(subject=subject)],
+            targets=[fname.filtered(subject=subject)],
 
             # How the script needs to be called. Here we indicate it should
             # have one command line parameter: the name of the subject.
-            actions=['python 00_filtering.py %s' % subject],
+            actions=['python 00_filter.py %s' % subject],
+        )
+
+def task_prepare_raw():
+    """Step 01: An example analysis step that is executed for each subject."""
+    # Extract epochs for each subject.
+    for subject in subjects:
+        yield dict(
+            task_dep=['filter'],
+            name=subject,
+            file_dep=['00_filter.py', '01_prepare_raw.py'],
+            targets=[fname.prepared(subject=subject)],
+            actions=['01_prepare_raw.py %s' % subject],
         )
 
 def task_make_epochs():
@@ -63,11 +76,11 @@ def task_make_epochs():
     # Extract epochs for each subject.
     for subject in subjects:
         yield dict(
-            task_dep=['filtering'],
+            task_dep=['prepare_raw'],
             name=subject,
-            file_dep=['00_filtering.py', '01_make_epochs.py'],
-            targets=[fname.epoching(subject=subject)],
-            actions=['python 01_make_epochs.py %s' % subject],
+            file_dep=['00_filter.py', '01_prepare_raw.py', '02_make_epochs.py'],
+            targets=[fname.epoched(subject=subject)],
+            actions=['python 02_make_epochs.py %s' % subject],
         )
 
 def task_apply_ica():
@@ -77,12 +90,12 @@ def task_apply_ica():
         yield dict(
             task_dep=['make_epochs'],
             name=subject,
-            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py'],
-            targets=[fname.cleaned_epochs(subject=subject)],
-            actions=['python 02_apply_ica.py %s' % subject],
+            file_dep=['00_filter.py', '01_prepare_raw.py', '02_make_epochs.py', '03_apply_ica.py'],
+            targets=[fname.epoched_cleaned(subject=subject)],
+            actions=['python 03_apply_ica.py %s' % subject],
         )
 
-def task_make_evoked():
+def task_make_evokeds():
     """Step 03: An example analysis step that is executed for each subject."""
     # Extract epochs for each subject.
     # Problem: nur einmal ausführen??
@@ -90,20 +103,20 @@ def task_make_evoked():
         yield dict(
             task_dep=['apply_ica'],
             name=subject,
-            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py'],
-            targets=[fname.evokeds(subject=subject)],
-            actions=['python 03_make_evoked.py %s' % subject],
+            file_dep=['00_filter.py', '01_prepare_raw.py', '02_make_epochs.py', '03_apply_ica.py', '04_make_evokeds.py'],
+            targets=[fname.evoked(subject=subject)],
+            actions=['python 04_make_evokeds.py %s' % subject],
         )
 
-def task_decoding():
+def task_decode():
     """Step 03: An example analysis step that is executed for each subject."""
     # Extract epochs for each subject.
     # Problem: nur einmal ausführen??
     for subject in subjects:
         yield dict(
-            task_dep=['make_evoked'],
+            task_dep=['make_evokeds'],
             name=subject,
-            file_dep=['00_filtering.py', '01_make_epochs.py', '02_apply_ica.py', '03_make_evoked.py', '05_decoding.py'],
+            file_dep=['00_filter.py', '01_prepare_raw.py', '02_make_epochs.py','03_apply_ica.py', '04_make_evokeds.py', '06_decode.py'],
             targets=[],
-            actions=['python 05_decoding.py %s' % subject],
+            actions=['python 06_decode.py %s' % subject],
         )

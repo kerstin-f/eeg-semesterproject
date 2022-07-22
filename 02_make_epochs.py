@@ -3,11 +3,7 @@ Perform bandpass filtering.
 """
 import argparse
 import mne
-import numpy as np
-from matplotlib import pyplot as plt
 import config as cfg
-import utils
-from autoreject import AutoReject
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
@@ -17,7 +13,7 @@ subject = args.subject
 print('Processing subject:', subject)
 
 # Load filtered raw data and create epochs
-raw = mne.io.read_raw_fif(cfg.fname.filtering(subject=subject), preload=True)
+raw = mne.io.read_raw_fif(cfg.fname.prepared(subject=subject), preload=True)
 
 # evts: sample, duration, event_id
 evts, evts_dict = mne.events_from_annotations(raw)
@@ -33,6 +29,7 @@ epochs = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    baseline=None,
                     reject_by_annotation=False, 
                     preload=True)
 
@@ -42,6 +39,7 @@ epochs_manual = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    baseline=None,
                     reject_by_annotation=True,
                     preload=True)
                     
@@ -52,17 +50,22 @@ epochs_tresh = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    baseline=None,
                     reject=reject_criteria,
                     reject_by_annotation=False,
                     preload=True)
 
+
+epochs_combined = mne.epochs.combine_event_ids(epochs_manual, cfg.targets, {'Targets': 0}, copy=True)
+epochs_combined = mne.epochs.combine_event_ids(epochs_combined, cfg.distractors, {'Distractors': 1}, copy=True)
+epochs_combined = epochs_combined[['Targets','Distractors']]
+
 print(f'Writing {len(epochs)} epochs to disk.')
-epochs_manual.save(cfg.fname.epoching(subject=subject), overwrite=True)
+epochs_combined.save(cfg.fname.epoched(subject=subject), overwrite=True)
 
 # Add a plot of the data to the HTML report
 with mne.open_report(cfg.fname.report(subject=subject)) as report:
-    # Missing: Plot raw data and power spectral density.
-    report.add_epochs(epochs=epochs, title='Extracted epochs', psd=False, replace=True)
+    report.add_epochs(epochs=epochs, title='Epoched data', psd=False, replace=True)
 
     fig1 = mne.viz.plot_events(evts, 
                               sfreq=raw.info['sfreq'],
@@ -72,12 +75,12 @@ with mne.open_report(cfg.fname.report(subject=subject)) as report:
     
     # Plot all trials 'manually', without using mne's functionality
     fig2 = epochs_manual.plot(n_epochs=10, show_scrollbars=False)
-    report.add_figure(fig2,'10 Epochs after rejection based on annotation', replace=True)
+    report.add_figure(fig2,'10 Epochs (rejection based on annotation)', replace=True)
 
     # Compare epochs_thresh with  manual rejection and with the ERPs without rejection
     fig2 = mne.viz.plot_compare_evokeds({'without rejection':epochs.average(),
-                                         'based on annotation':epochs_manual.average(),
-                                         'based on thresh':epochs_tresh.average()},
+                                         'rejection based on annotation':epochs_manual.average(),
+                                         'rejection based on thresh':epochs_tresh.average()},
                                          picks=cfg.plot_channel_epoching,
                                          show=False)
     report.add_figure(fig2,'Comparison of ERPs '+ cfg.plot_channel_epoching, replace=True)
