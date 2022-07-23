@@ -46,8 +46,8 @@ print(' ===== END CHANNELS =====')
 ch_test = ['FP1', 'F3', 'F7', 'FC3', 'C3', 'C5', 'P3', 'P7', 'P9', 'PO7', 'PO3', 'O1', 'Oz', 'Pz',
            'CPz', 'FP2', 'Fz', 'F4', 'F8', 'FC4', 'FCz', 'Cz', 'C4', 'C6', 'P4', 'P8', 'P10', 'PO8', 'PO4']
 
-epochs.pick_channels(cfg.channels_to_analyze)
-#epochs.pick_channels(ch_test)
+#epochs.pick_channels(cfg.channels_to_analyze)
+epochs.pick_channels(ch_test)
 
 # Problem: When to pick channels? Not here...
 # epochs.pick_channels(cfg.channels_to_analyze)
@@ -73,12 +73,14 @@ epochs_distractors = epochs['Distractors']
 # -> Don't crop, csp.fit_transform needs sufficiently large time window
 
 # csp = mne.decoding.CSP(n_components=2)
-labels =[0]*len(epochs_targets)+[1]*len(epochs_distractors)
+# labels =[0]*len(epochs_targets)+[1]*len(epochs_distractors)
+labels = epochs.events[:,-1]
+
 # csp.fit_transform(epochs.get_data(), labels)
 # csp_data = csp.transform(epochs.get_data())
 
 lda = LinearDiscriminantAnalysis()
-csp = mne.decoding.CSP(n_components=2)
+csp = mne.decoding.CSP(n_components=2, reg=0.1)
 pipe = sklearn.pipeline.Pipeline([('CSP', csp), ('LDA', lda)])
 
 # cv = sklearn.model_selection.StratifiedShuffleSplit(10, test_size=0.2, random_state=1)
@@ -94,8 +96,8 @@ pipe = sklearn.pipeline.Pipeline([('CSP', csp), ('LDA', lda)])
 # epochs_data_picks = epochs.get_data(picks=cfg.plot_channels_scatter).mean(axis=2)
 # epochs_data_transformed = csp.transform(epochs.get_data())
 
-w_size = 1
-resample = 40
+w_size = 0.1
+resample = 100
 timeVec = epochs.copy().resample(resample).times
 timeVec = timeVec[::10]
 t_scores = np.zeros(len(timeVec))
