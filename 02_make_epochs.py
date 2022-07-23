@@ -1,9 +1,10 @@
 """
 Perform bandpass filtering.
 """
+import config as cfg
 import argparse
 import mne
-import config as cfg
+mne.set_log_level(cfg.mne_log_level) 
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
@@ -22,6 +23,8 @@ evts, evts_dict = mne.events_from_annotations(raw)
 stim_keys = [e for e in evts_dict.keys() if "stimulus" in e]
 evts_dict_stim = dict((k, evts_dict[k]) for k in stim_keys if k in evts_dict)
 
+picks = mne.pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False,
+                       exclude='bads')
 # Epoch the data
 # Get epochs without rejection
 epochs = mne.Epochs(raw, 
@@ -29,6 +32,7 @@ epochs = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    proj=True,
                     baseline=None,
                     reject_by_annotation=False, 
                     preload=True)
@@ -39,6 +43,8 @@ epochs_manual = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    proj=True,
+                    picks=picks,
                     baseline=None,
                     reject_by_annotation=True,
                     preload=True)
@@ -50,6 +56,7 @@ epochs_tresh = mne.Epochs(raw,
                     event_id=evts_dict_stim,
                     tmin=cfg.epochs_tmin, 
                     tmax=cfg.epochs_tmax,
+                    proj=True,
                     baseline=None,
                     reject=reject_criteria,
                     reject_by_annotation=False,

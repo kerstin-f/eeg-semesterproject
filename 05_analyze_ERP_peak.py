@@ -1,12 +1,13 @@
 """
 Perform bandpass filtering.
 """
+import config as cfg
 import argparse
 import mne
+mne.set_log_level(cfg.mne_log_level) 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-import config as cfg
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)

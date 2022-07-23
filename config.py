@@ -22,6 +22,11 @@ os.environ['OMP_NUM_THREADS'] = str(n_jobs)
 
 
 ###############################################################################
+# MNE config
+
+mne_log_level = 'WARNING'
+
+###############################################################################
 # These are all the relevant parameters for the analysis.
 
 bids_root = "./data/p3/"
@@ -41,8 +46,8 @@ subjects = ['002']
 
 ###############################################################################
 # FREQUENCY FILTERING
-l_freq = 0.5
-h_freq = 50.0
+l_freq = 0.1
+h_freq = 30.0 # 50.0
 
 plot_channel_filtering = 'Pz'
 
@@ -50,14 +55,14 @@ plot_channel_filtering = 'Pz'
 # EPOCHING
 
 
-epochs_tmin = -0.1
+epochs_tmin = -1.0 #-0.1
 """
 The beginning of the time window for metadata generation, in seconds,
 relative to the time-locked event of the respective epoch. This may be less
 than or larger than the epoch's first time point. If ``None``, use the first
 time point of the epoch.
 """
-epochs_tmax = 1
+epochs_tmax = 4.0 # 1.5
 # 1
 """
 Same as ``epochs_metadata_tmin``, but specifying the **end** of the time
@@ -73,6 +78,10 @@ plot_channel_epoching = 'Pz'
 targets = ['stimulus:11', 'stimulus:22', 'stimulus:33', 'stimulus:44', 'stimulus:55']
 distractors = ['stimulus:21', 'stimulus:31', 'stimulus:41', 'stimulus:51', 'stimulus:12', 'stimulus:32', 'stimulus:42', 'stimulus:52', 'stimulus:13', 'stimulus:23',
                'stimulus:43', 'stimulus:53', 'stimulus:14', 'stimulus:24', 'stimulus:34', 'stimulus:54', 'stimulus:15', 'stimulus:25', 'stimulus:35', 'stimulus:45']
+
+plot_channels_compare_evokeds = ['C3','C4']
+
+plot_channels_scatter = ['C3','C4']
 
 decoding_n_splits: int = 5
 """

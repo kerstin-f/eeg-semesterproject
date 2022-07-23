@@ -1,9 +1,10 @@
 """
 Perform bandpass filtering.
 """
+import config as cfg
 import argparse
 import mne
-import config as cfg
+mne.set_log_level(cfg.mne_log_level) 
 import utils
 
 # Handle command line arguments

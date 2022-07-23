@@ -1,8 +1,10 @@
 """
 Perform bandpass filtering.
 """
+import config as cfg
 import argparse
 import mne
+mne.set_log_level(cfg.mne_log_level) 
 import numpy as np
 import pandas as pd
 import utils
@@ -10,7 +12,6 @@ from mne.preprocessing import read_ica
 from matplotlib import pyplot as plt
 
 # All parameters are defined in config.py
-import config as cfg
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)

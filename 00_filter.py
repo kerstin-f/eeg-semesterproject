@@ -1,8 +1,10 @@
 """
 Perform bandpass filtering.
 """
+import config as cfg
 import argparse
 import mne
+mne.set_log_level(cfg.mne_log_level) 
 import utils
 import numpy as np
 import pandas as pd
@@ -10,7 +12,6 @@ from matplotlib import pyplot as plt
 from scipy import signal
 
 # All parameters are defined in config.py
-import config as cfg
 
 # Handle command line arguments
 parser = argparse.ArgumentParser(description=__doc__)
@@ -23,8 +24,8 @@ print('Processing subject:', subject)
 raw = utils.import_raw(subject, cfg.task)
 
 # Apply frequency filtering
-raw_filtered_acausal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='zero')
-raw_filtered_causal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='minimum')
+raw_filtered_acausal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='zero', skip_by_annotation='edge')
+raw_filtered_causal = raw.copy().filter(l_freq=cfg.l_freq, h_freq=cfg.h_freq,fir_design='firwin', phase='minimum', skip_by_annotation='edge')
 
 raw_filtered_acausal.save(cfg.fname.filtered(subject=subject), overwrite=True)
 
