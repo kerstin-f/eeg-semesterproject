@@ -1,0 +1,452 @@
+<introduction>
+    <task>
+        The P3 is present in almost every task, but is classically observed in the oddball paradigm. The subjects are shown different letters, with a hint in advance that a particular letter is the target letter. This oddball triggers a larger P3 peak than any distractor letter. It is expected that the P3 is observed in the upper half of the head. In general, the P3 amplitude is inversely related to the probability of the stimulus. In the present data set, target events occurred with a probability of 0.2, distractor events with a probability of 0.8.
+    </task>
+    <implementation>
+        The git repository contains a multi-step pipeline designed to process the P3 dataset. Each step corresponds to a single Python script and performs a specific task. The scripts build on each other by using the output of one script as the input of a subsequent script. All scripts have a comparable coarse structure. The data to be processed is read in, processed according to the specific task of a step and saved. Finally, plots are generated to visually assess the correct functionality and results of a step. 
+        </br>
+        A script processes either the data of one subject or all subjects per invocation. The scripts <em>00_apply_filter</em> to <em>05_make_evokeds</em> preprocess the data of the individual subjects. <em>06_analyze_single</em> performs an analysis of the ERP peak at single-subject level. This is followed by an analysis of the ERP peak at group level via <em>07_analyze_all</em>. The data of all subjects is included in this task. The tasks <em>08_run_decoding</em> and <em>09_source_localization</em> again use a single subject's data and implement the two selected tasks Decoding Analysis and Source Localization.
+        </br>
+        <br></br>
+        <br></br>
+        <h6>dodo.py</h6>
+        The master script <em>dodo.py</em> controls the sequence and call of all individual scripts. It uses the build system pydoit. The order in which the tasks are defined in <em>dodo.py</em> corresponds to their execution order. If a script refers to a single subject, <em>dodo.py</em> loops over all subjects to be processed and passes its number as a command line parameter to the task. 
+        </br>
+        <br></br>
+        <br></br>
+        <h6>utils.py</h6>
+        The <em>utils.py</em> script adapts and extends <em>ccs_eeg_semesterproject.py</em>, which is provided on github. The following types of functions are bundled in the script:
+        <ul>
+            <li>Functions that read in the data for certain pipeline steps and make them available via a suitable data structure</li>
+            <li>Functions that are used for peak analysis, as these are used by the two tasks <em>analyze_single</em> and <em>analyze_all</em> together</li>
+            <li>Functions used to create this HTML report</li>
+        </ul>.
+        <h6>config.py</h6>
+        Global parameter settings have been outsourced to the higher-level <em>config.py</em> script. It is imported by all scripts in the pipeline. In its first section, the user can view general settings that usually have to be set once and that do not change when the pipeline is executed several times on the same dataset (e.g. directory of raw data, task name). Via the variable <em>subjects</em>, the user can define which subjects are to be processed in the next execution of the pipeline. Optionally, <em>subjects_manual</em> can be used to list the subjects for which ICA is to be explicitly calculated without relying on precomputed results. These global settings are followed by sections that correspond to the individual tasks of the pipeline. A user can understand which values are used for an run and, if necessary, adapt them for the next run without having to modify the code of the individual steps. More detailed notes on the individual parameters and permitted values/value ranges are provided as comments directly in <em>config.py</em>. Based on the settings of the submitted config.py, the results presented in this report were produced. 
+        </br>
+        </br>
+        The last section of <em>config.py</em> contains all the folders and files that are consumed and produced by the tasks. The pipeline operates on the following four paths:
+        <ul>
+            <li>raw_data_dir: Path to the ERP-CORE dataset of the P3 experiment with cleaning times, bad channels and ICA already specified.</li>
+            <li>provided_data_dir: Path to the manually determined cleaning times, bad channels and bad components of the three subjects 002, 003, 004.</li>
+            <li>processed_data_dir: Path to the output files of the pipeline.</li>
+            <li>reports_dir: Path to the generated HTML reports.</li>
+        </ul>
+
+    </implementation>
+
+</introduction>
+
+<references>
+    <content>
+        <ol>
+            <li id="1"> <a href="https://mne.tools/stable/auto_tutorials/index.html">MNE Tutorials</a></li>
+            <li id="2"> <a href="https://neuro.inf.unibe.ch/AlgorithmsNeuroscience">Computational Neuroscience at the Institute of Computer Science, University of Bern</a></li>
+            <li id="3"> Kappenman, Emily S., et al. "ERP CORE: An open resource for human event-related potential research." NeuroImage 225 (2021): 117465.</li>
+            <li id="4"> Gramfort, Alexandre, et al. "MEG and EEG data analysis with MNE-Python." Frontiers in neuroscience (2013): 267.</li>
+        </ol>
+    </content>
+</references>
+
+<apply_filter>
+    <implementation>
+        The task apply_filter is the first task that works with EEG data. This data refers to a single subject and is read in via the utils function import_raw. The function loads the raw data via a properly instantiated BIDSPATH object into the mne.Raw data structure and returns it. The raw object is already annotated with metadata about the experiment. The annotations allow a mapping between the time points of the EEG recording and the description of what happened at those time points. After these data have been successfully loaded, they are filtered.
+        EEG Research focuses on EEG signals that mainly capture signal power in a frequency range of 1-30 Hz. However, not only the actual EEG signals are recorded, but also noise. Movements of the head or electrode wires and sweat on the subjects' skin causes low frequency noise. In EEG signals, this appears in the form of slow drifts over several seconds. High frequency noise results especially from muscle contractions. Rapid up and down movements of the signal indicate high frequency noise. To reduce these effects of noise, the EEG signal is filtered above and below the frequency range of interest.
+        <pre>
+            <code>
+raw_filtered_acausal = raw.copy().filter(l_freq=cfg.low_freq, h_freq=cfg.high_freq,fir_design='firwin', phase='zero', skip_by_annotation='edge')
+            </code>
+        </pre>
+        Frequency filtering is performed on the continuous raw data. In the later preprocessing step make_epochs, the raw object is split into shorter epochs whose samples are not sufficient to accurately estimate and remove also slow frequencies. The pipeline applies a band-pass filter to the raw object, with a low-frequency cut-off of 0.1 Hz and a high-frequency cut-off of 30 Hz. These settings are chosen to reduce the effects of low- and high-frequency artifacts without filtering out the signals of interest and without introducing new artifacts into the EEG signals. In general, good time-domain characteristics have to be considered in the filter design and trade-offs between e.g. between ripple in the pass-band, attenuation in the stop-band and time-domain ringing have to be made. The pipeline uses a zero-phase 'firwin' filter. Its transition band provides a flat roll-off of the filter in the frequency domain. An abrupt drop in power would introduce artefacts in the time domain. More precisely, filters with a sharp cut-off can produce outputs that ring for a long time when applied to signals with frequency content in the corresponding transition band. Setting phase = 'zero' compensates the delay of the filter and makes it an acausal filter. Non-causal filtering means that each sample is influenced by samples that lie both before and after it. This ensures that the timing of events is not delayed by the filtering.      
+    </implementation>
+</apply_filter>
+<prepare_raw>
+    <implementation>
+        The prepare_raw task groups several preprocessing steps, which are explained below by referring to the corresponding code snippets.
+        <pre>
+            <code>
+raw.annotations.append(badSegments.onset,badSegments.duration,badSegments.description) 
+raw.info['bads'].extend(badChannels)
+            </code>
+        </pre>
+        First, the script loads the filtered raw and uses two utils functions to access the provided bad time segments and bad channels. The data marked as bad are excluded early in the pipeline, as they are not to be considered in subsequent processing steps. Bad time segments are made known by adding their onset, duration and description to the annotations of raw. Raw.info is extended to hold bad channels without deleting their data. The 'bads' field of the info object is automatically transferred to derived Epoch and Evoked objects.
+        This cleaning step distinguishes whether the user requests manual cleaning for the current subject (i.e. by adding the subject to subjects_manual). If manual = True, the two utils functions preferably access the files that contain the manually defined data.
+        <pre>
+            <code>
+mne.set_bipolar_reference(raw, anode=anode, cathode=cathode, ch_name=ch, drop_refs=False,copy=False)
+            </code>
+        </pre>
+        In addition to the 30 EEG channels, the P3 data set also contains 3 EOG channels, which can be viewed in the channels.tsv file of each subject. The config parameter bipolar_channels calculates two new virtual EOG channels whose data correspond to the difference between two other channels. A bipolar HEOG signal is calculated by subtracting left_HEOG and right_HEOG, a bipolar VEOG signal is calculated by subtracting lower_VEOG and channel FP2. [1] The two new virtual channels HEOG and VEOG are assigned to the raw object as EOG channels via set_channel_types. 
+        <pre>
+            <code>
+raw.set_montage('standard_1020',match_case=False)
+            </code>
+        </pre>
+        [3] describes that the P3 data set was recorded from 30 electrodes placed on the subject's head according to the international 10/20 system. Since the original EEG data do not contain any information about the electrode locations, they are explicitly set to the standard locations 'standard_1020'.
+        <pre>
+            <code>
+raw.set_eeg_reference(cfg.reference)
+            </code>
+        </pre>
+        The microVolt measurement at each electrode is the difference in electrical potential at that electrode compared to a reference electrode. Ideally, the reference signal will not capture brain-specific variations in electrical potential, but will capture ambient noise, which is also recorded by the other electrodes. For example, using a single reference electrode on one side of the head should be avoided: if this electrode records artefactual data, it will affect the data of all other electrodes when re-referencing. In [3], both channels P9 and P10 were placed close to the mastoids. Analogous to [3], the pipeline re-references the EEG signals to the average of channels P9 and P10. The signal of this virtual reference electrode is therefore subtracted from the signals of the other electrodes.  In addition, the re-referencing is done explicitly after the bad channels have been marked. This is to prevent artefacts from bad channels being transferred to the other channels if the user sets a different reference in config.py.
+
+    </implementation>
+</prepare_raw>
+<run_ica>
+    <implementation>
+        The task run_ica is only executed on subjects that are specified via the config parameter subjects_manual. An Idependent Component Analysis (ICA) is performed on these subjects. The aim of an ICA is to determine independent source signals from a series of recordings in which the source signals have been mixed together in unknown proportions. The source signals in EEG come from brain activity of different brain regions, but also from blinking, eye movements, muscle contractions or heartbeats of the subject. Mathematically independent components resulting from ICA correspond to the individual underlying signals that were mixed together during recording. Any components that do not have underlying brain activity should be considered as artefacts and be removed.
+        <pre>
+            <code>
+raw_filtered = raw.copy().filter(l_freq=1.0,h_freq=cfg.high_freq,fir_design='firwin', phase='zero')
+            </code>
+        </pre>
+        Before ICA is applied to the raw data of the subject, it is again filtered through a high-pass filter with a cut-off frequency of 1 Hz. This setting is recommended by mne to remove low-frequency drifts and increase the quality of the ICA fit. Since filtering is a linear operation, the ICA solution of the more heavily filtered raw can still be applied later to the raw that was saved in the previous pipeline step.
+
+        <pre>
+            <code>
+ica = mne.preprocessing.ICA(n_components=ica_n_components, method=cfg.ica_method, random_state=cfg.ica_random_state)
+ica.fit(raw_filtered, reject_by_annotation=True, reject=cfg.ica_reject, verbose=True)
+            </code>
+        </pre>
+        The code snippet shows how first an ICA object is created and then the object is fitted to the data according to the parameter settings. Internally, this essentially involves two steps:
+        <ol>
+            <li>data is first scaled to unit variance and whitened using principal component analysis (PCA)</li>
+            <li>pre-whitened data are then decomposed using ICA</li>
+        </ol>
+        The ICA decomposition is performed using the infomax algorithm. Since no covariance matrix is provided, the pre-whitening is done by scaling the data of one channel type by the standard deviation over all channels. The maximum number of ICs that can be derived corresponds to the number of channels in a data set. Therefore, the parameter n_components is set to the number of EEG channels minus the two channels used for re-referencing. The parameter determines how many principal components (PCs) are passed from PCA to the ICA algorithm. 
+        The user should not change the parameter ica_random_state in config.py if he or she is aiming for reproducible results. Only a constant random_state between different executions of the script ensures that the components are returned in the same order and with the same sign. This is especially important for the three manually cleaned subjects, as their badComponents are identified via a provided tsv file.
+        <pre>
+            <code>
+eog_idx, scores = ica.find_bads_eog(eog_epochs, threshold=cfg.ica_eog_threshold, ch_name=cfg.eog_channels)
+            </code>
+        </pre>
+        A manual identification of the bad components was only done for the subjects 002, 003 and 004. The bad components of the other subjects are automatically identified in the task run_ica using the two EOG channels. EOG electrodes are placed close to the eyes during recording, so information on blinks and eye movements can be derived from the data of the EOG channels. The virtual bipolar EOG channels generated in the pipeline can be used in the same way. The mne function find_bads_eog finds EOG artefacts in the data by pattern matching and excludes the EOG-related ICs.  
+        <br/><br/>
+        However, the detection of bad components exclusively via EOG channels does not always lead to good and reliable results. It is always a good idea to visualise the ICs, check the automatically generated eog-badComponents.tsv and modify it manually if necessary. Despite the faulty detection, the pipeline builds on this solution approach, as the tasks run_ica could otherwise only be executed on the manually viewed subjects 002, 003, 004. The badComponents provided in the P3 data set (in ica.tsv) can only be used in combination with the precomputed ICA decomposition due to the potentially different order and sign.
+    </implementation>
+</run_ica>
+<apply_ica>
+    <implementation>
+        The task apply_ica is executed for all subjects regardless of whether the ICA decomposition was precomputed via the previous task run_ica or is obtained from the file ica.set. The artifactual ICs that are declared for exclusion via ica.exclude can be obtained from three different files:
+        <ol>
+            <li>from the file ica.tsv of the provided P3 dataset, if the user does not request manual cleaning for the subject</li>
+            <li>from the file manual-badComponents.tsv, which the user has explicitly created after reviewing the ICs</li>
+            <li>from the file eog-badComponents.tsv, if the user requests manual cleaning but has not performed a manual check of the ICs</li>
+        </ol>
+        <pre>
+            <code>
+cleaned_raw = ica.apply(raw.copy())
+            </code>
+        </pre>
+        An ICA decomposition separates the different source signals. Using the apply() method applied to the loaded ICA decomposition, the sensor signals are reconstructed excluding the artifactual ICs. In other words, the signal reconstruction uses all ICs that have not been identified as artifactual and are therefore not included in ica.exclude. Finally, the reconstructed raw object is saved for further processing by the next pipeline step. Points 2 and 3 are based on the preprocessing of [3].
+      
+    </implementation>
+</apply_ica>
+<make_epochs>
+    <implementation>
+        Epochs are used to represent data that is linked to repeated experimental events. In case of the P3 experiment, this is the onset of the stimulus and the button press of the subject. The pipeline is primarily interested in the neural response to the stimulus. In that sense, the neural activity associated with the planning and execution of the button press can be considered an artefact relative to the signal of interest. The task make_epochs therefore adjusts the content of the two variables evts and evts_dict before segmenting the data into epochs. The dictionary evts_dict maps event labels to integer event codes in the events array evts. 
+        <br/><br/>
+        The following three steps modify evts and evts_dict:
+        <ol>
+            <li>The dictionary evts_dict is restricted to labels that contain the word 'stimulus'. The events that refer to the behavioural response of the subject are removed. </li>
+            <li>Stimulus events that were followed by a response that was too early or too late are removed from the array evts. These responses are determined by calculating the difference in the onset column of the events.tsv file. If the difference is outside a time period considered to be acceptable, the previous event is excluded from the array evts.</li>
+            <li>Stimulus events that were followed by an incorrect response are removed from the array evts. Incorrect responses are identified by their event code and the previous event is deleted from the array evts.</li>
+        </ol>
+        This is followed by the splitting of the continuous, filtered EEG raw data into epochs time-locked to the events of interest. When setting the start time of an epoch, it is important to ensure a sufficient baseline period  to compare it with the activity after the stimulus onset. The end time must include the timing of the expected P3 component. The values for the start and end times of the epochs were taken from [3]. Depending on the settings in config.py, the pipeline applies different methods to reject epochs. A good balance has to be found between the still acceptable data quality and the data loss due to too many dropped epochs.
+        After generating the epochs, the data has a three-dimensional structure with the dimensions of epochs, channels and time. To simplify their use in subsequent steps, the event labels and event codes are renamed and combined according to the experimental conditions. Epochs that refer to distractor or target events are subsequently easier to select. Finally, epochs are saved as an intermediate result.
+    </implementation>
+</make_epochs>
+<make_evokeds>
+    <implementation>
+        The task make_evokeds computes the average over epochs of a subject to get the stimulus-evoked activity. It produces one evoked data set for each of the experimental conditions 'Distractor' and 'Target'. 
+        <pre>
+            <code>
+_evoked_diff = mne.combine_evoked(list(evokeds_dict_traditional.values())[:2], weights=[-1, 1])
+            </code>
+        </pre>
+        As subsequent pipeline steps analyse the difference between the conditions, a third Evoked object is produced by subtracting the Evokeds of the two conditions. The P3 appears as a larger positivity, therefore the distractor evoked is subtracted from the target evoked. This makes the difference between the values show up as positive instead of negative voltage. In addition, the overall average is formed over all epochs. The four evoked data sets are written out together as a.list in a file.
+        <br/><br/>
+        <pre>
+            <code>
+_evoked = epochs[condition].average().apply_baseline(cfg.baseline)
+            </code>
+        </pre>
+        It is important to highlight that the stored Evokeds data sets are baseline-corrected. The config parameter baseline specifies which time period is used to define the voltage "zero" of an epoch. A baseline correction is performed because the measured electrical potentials can drift in the course of the recording and these low-frequency drifts may differ between the conditions. As a result, the absolute microVolt values could vary considerably between epochs. It is assumed that these baseline drifts have nothing to do with the actual ERPs. Furthermore, DC offsets might have been introduced by ICA , which is why the baseline correction is subsequent to ICA decomposition. Analogous to [3], the pipeline uses a baseline period of (None, 0). This corresponds to the time between the start of the epoch and the stimulus onset. 
+    </implementation>
+    <topomaps>
+        löschen. Das ‚bads‘ Feld des Info-Objekts wird automatich an abgeleitete Epochs- und Evoked-Objekte übertragen.
+        Bei diesem Cleaning-Schritt wird unterschieden, ob der Benutzer für das aktuelle Subject ein manuelles Cleaning fordert (d.h. durch Hinzufügen des Subjects zu subjects_manual). Wenn manual = True ist, greifen die beiden utils-Funktionen vorzugsweise auf die Files zu, die die manuel
+    </topomaps>
+</make_evokeds>
+<analyze_single>
+    <implementation>
+        The task <em>analyze_single</em> refers to the analysis of single-subject data. For this purpose, the subject's epochs and evoked difference are loaded from previous pipeline steps. Based on these data, various plots are produced. The following describes what information is extracted from the data and what tests are performed on the data.
+
+        [3] mentions that the P3 task was designed to isolate the P3 ERP component from overlapping brain activity using its difference waveform. Ideally, difference waves eliminate brain activity that is common to both conditions. Because of this property, the difference wave can be used to assess the magnitude and time course of processes that differ between the two conditions. Using the MNE function <em>get_peak()</em>, encapsulated in the utils function <em>get_peak_info()</em>, the pipeline determines the maximum peak amplitude and associated latency in an a priori set time window. The function is called on the evoked data set of all channels as well as separately on the evoked data set of the channel of interest. The MNE function is very easy to use, but it should be stressed that it does not guarantee finding the actual peak. The output plot allows the user to visually assess where the peak was detected and how the returned values are to be judged. 
+        <pre>
+            <code>
+html_peak_info_all, fig_peak_info_all = utils.get_peak_info(evoked_diff)
+html_peak_info_choi, fig_peak_info_choi = utils.get_peak_info(evoked_diff_choi)
+            </code>
+        </pre>
+
+        The MNE function <em>to_data_frame()</em> can be used to create a pandas dataframe from the Epochs object. One line of the data frame corresponds to one sample. The data of the dataframe is used as basis for visualizing the distribution of peak amplitudes and latencies across epochs. From the original dataframe <em>df_epochs</em>, the actually desired dataframe <em>df_max</em> is obtained by appropriate grouping and transformation. More precisely, the following steps are performed on <em>df_epochs</em>:
+        <ol>
+            <li>selection of the a priori assumed time window that is suitable for measuring the P3 [3]</li>
+            <li>grouping by epochs column, since per epoch the maximum amplitude and associated latency is searched for</li>
+            <li>selection of the column of the channel of interest specified in <em>config.py</em>, since the maximum of this column is searched for</li>
+            <li>transformation via the max-aggregation operator to determine the maximum amplitude</li>
+            <li>application of the resulting index to the <em>df_epochs</em> to store the entire row belonging to the max entry in <em>df_max</em></li>
+        </ol>
+
+        <pre>
+            <code>
+df_epochs = epochs_choi.copy().crop(cfg.good_tmin, cfg.good_tmax).to_data_frame()
+ix = df_epochs.groupby(['epoch'])[cfg.choi].transform(max) == df_epochs[cfg.choi]
+df_max = df_epochs[ix]
+            </code>
+        </pre>
+        A permutation T-test is executed on Epochs data. A single value per epoch and channel is included in the test. It corresponds to the mean of the data in the a priori assumed time window. No distinction is made between target and distractor epochs. A T-test can be used to assess the statistical significance of the difference between sample means. In this application, the data is to be examined for a difference between the channels. The aim of the permutation T-test is to visualize statistical values in a topomap to evaluate which channels can be considered significant for the P3 experiment. This requires data from all channels to be included in the test. In a single statistical test, a null hypothesis should be rejected with a certain probability. This significance level describes the probability of a random result if no experimental effect was actually present. Since data from all channels are included in the test, the probability of false-positive results increases without multiple comparisons correction.
+        </br>
+        In thid case, multiple comparisons correction is done by permutations. The parameter setting <em>tail=1</em> specifies a 1-tailed test. It is supposed to predict a positive T-value, since the P3 shows greater positivity. The null hypothesis assumes that there is no effect, i.e. no difference between the curves of the different channels. The distribution of the T-values over many random permutations is then purely random. This means that, assuming the null hypothesis is true, the data of the channels could be exchanged and no difference in the distribution of the T-values would be detected. After performing the permutations, a significance threshold is derived from the null distribution. The top 5% of the T-values from the permutations are to be considered as 'significant'. From the resulting P-values, only P-values&amp;lt;0.05 are visualized.
+        <pre>
+            <code>
+permutation_t_test_data = np.mean(epochs.get_data(tmin=cfg.good_tmin, tmax=cfg.good_tmax), axis=2)
+fig_evoked_topomap = utils.perform_t_test(permutation_t_test_data, info_obj, picks)
+            </code>
+        </pre>
+        The permutation cluster test refers to the specified channel of interest. Its data is extracted separately for the two conditions across all epochs and passed to the utils function <em>perform_permutation_cluster_test</em>. The test is based on the following null hypothesis: The distribution of cluster sizes observed in two experimental conditions are drawn from the same probability distribution [1]. In particular, the test exploits the fact that temporally adjacent samples show similar activity. A cluster can be described by temporally adjacent samples whose F-value is higher than the cluster forming threshold. The cluster mass is obtained by summing the F-values.
+        </br>
+        When the test is executed, the data is permuted e.g. 1000 times according to the config setting <em>n_permutation_cluster</em>. Analogous to the permutation T-test, the parameter <em>tail</em> is set to <em>tail=1</em>. The <em>threshold</em> parameter is not intuitive to set. It is a mostly arbitrary threshold that influences when a cluster is formed. Threshold-free cluster enhancement (TFCE) could ensure that all relevant clusters are detected, regardless of whether it is a peaky or broad cluster. However, this parameter setting does not currently work in combination with the appended plot generation.
+        </br>
+        After each permutation, F-values are recalculated. From the collected cluster masses across all permutations, the null distribution can be derived. The cluster mass(es) of the actual, unpermuted data is compared to the null distribution and the P-value of the cluster(s) is derived from the proportion of smaller null distribution values. If a P-value is smaller than the threshold value 0.05, then this suggests that the null hypothesis should be rejected. In other words, if the null distribution shows that a sufficient number of permuted clusters are smaller than the cluster of the actual data, then this indicates a difference between the conditions. The samples belonging to these clusters are not interchangeable. However, the permutation cluster test says nothing about the significance of the individual samples. 
+        <pre>
+            <code>
+permutation_cluster_test_data = [epochs_choi[condition].get_data()[:,0,:] for condition in cfg.conditions]
+fig_permutation_cluster_test = utils.perform_permutation_cluster_test(permutation_cluster_test_data, evoked_diff_choi)
+            </code>
+        </pre>
+    </implementation>
+    <peak_measures>
+        The maximum amplitude of the difference wave should give information about the difference in magnitude between the neuronal responses of both conditions. A possible difference in peak latency between distractor and target evoked is not measurable from the difference wave. 
+        </br>
+        It is possible that the peak measurement is distorted by latency shifts of the distractor and target evoked response. And it cannot be excluded that there is an overlap with an earlier component that is still going on. Simply looking at the difference in amplitude between conditions without looking at the original distractor and target evokeds can be misleading in interpretation. It is possibly a good idea to consider plots from the task <em>make_evokeds</em> for a better assessment of the measurements. 
+    </peak_measures>
+    <histograms>
+        The histograms allow to assess of how the peak amplitudes and associated latencies are distributed per epoch.
+    </histograms>
+    <permutation_t_test>
+        The permutation T-test identifies the channels CPz, PO3, PO4, P8, Oz, O2 as significant for Subject 2. The topographic map shows these channels as white dots. It also visualizes how the p-values are distributed on the subject's head. The actual P-values were transformed via the negative logarithm in such a way that the smallest p-values (i.e. the most significant) are highlighted in colour. For Subject 2, the highlighted area is concentrated on the upper part of the head. However, looking at the single-subject results of other subjects revealed a large variance across subjects.
+        </br>   
+        The histogram shows the null distribution resulting from the maximum T-value per permutation. With increasing T-values, the count tends towards zero. The upper 5% of the T-values are highlighted in colour.
+    </permutation_t_test>
+    <permutation_cluster_test>
+        In the plot of the F-value curve, time span is highlighted in red. The samples of this time span correspond to the cluster for which the permutation cluster test yields a cluster p-value&amp;lt;0.05. However, statistical statements on the result of the permutation cluster test can only refer to the cluster itself, not to the data from which it was derived. The multiple comparison correction achieved internally by the permutations relates to the cluster sizes, not to the individual time points. For example, it is possible that the entire cluster is significant, but the beginning and end of the cluster is not significant in itself. Therefore, it is difficult to make statistical statements based on a single cluster level. However, a descriptive statement can be made. A peak in the difference wave is clearly visible. It is likely that this comes from the cluster highlighted in the F-Value curve. 
+    </permutation_cluster_test>
+
+</analyze_single>
+<analyze_all>
+    <implementation>
+        The task <em>analyze_all</em> is the only pipeline step that includes the data of all subjects. Its implementation is inspired by the task <em>analyze_single</em>, which makes a more detailed description redundant. The main differences to <em>analyze_single</em> are listed below:
+        </br>
+        <ul>
+            <li>
+            The grand average over all processed subjects is calculated. This is done separately for the two conditions distractor and target, as well as over difference and total evokeds.
+            </li>
+            <li>
+            The dataframe <em>df_max</em> is constructed from evokeds of the subjects. One line per evoked is included in <em>df_max</em>. It provides information about the maximum amplitude, associated latency and condition.
+            </li>
+            <li>
+            In the permutation T-test, the mean value of the difference evoked is fed in for each subject. By entering this data, the difference between distractor and target condition is taken into account. The channels that can be considered as significant regarding the distinction between distractor and target evoked responses can be read from the resulting statistical topomap.  (In contrast, the permutation T-test in the task <em>analyze_single</em> was based on the entire epochs obejct of a subject. From the result, nothing can be derived about the distinction between distractor and target evoked responses. Instead, channels are highlighted that can be judged as significant for the entire P3 experiment of a subject).
+            </li>
+        </ul>
+        </br>
+        </br>
+        Since the task <em>analyze_all</em> refers to all subjects, it was not generated via the current <em>config.py</em>. To reproduce the following plots, the parameter setting <em>subjects='all'</em> must be set in <em>config.py</em>.
+    </implementation>
+    <comparison_grand>
+        The grand averages curves of target and distractor or the difference wave on its own show a clear maximum in the a priori assumed time window in which the P3 peak was to be expected. Also clearly visible is the C1, the first visual response originating from the primary visual cortex. It can be either positive or negative depending on whether the stimulus is presented above or below the point of fixation. For the observed channel Pz, the C1 polarity is positive.
+    </comparison_grand>
+    <histograms>
+        The histograms use an equal number of distractor and target evokeds on which the peak measurements are performed. The distribution of the peak amplitudes across 40 subjects shows a slight shift to the right. The highest amplitudes can be measured on some target evokeds. The distribution of the associated latencies is a bit more bundled than those measured over the distractor evokeds. In order to achieve a better significance of the histograms, a data set with more subjects would be helpful.
+    </histograms>
+    <permutation_t_test>
+        According to the statistical topomap, 16 channels are suitable for recording the evoked responses of the P3 experiment. The highest P-values are measured in the upper half of the head. The significant region supports the visualization of the scalp topography maps above. In these, the difference between distractor and target is greatest in a similar area.
+    </permutation_t_test>
+    <permutation_cluster_test>
+        Interpretation of the plot is analogous to that already described at single-subject level. The result at group level for the channel Pz is a single cluster with cluster P-value&amp;lt;0.05. The test results can only be interpreted at cluster level. This is also shown by the fact that the difference wave of Pz in the highlighted area does not look very meaningful over the entire time span.
+    </permutation_cluster_test>
+
+</analyze_all>
+
+<decoding>
+    <implementation>
+        Decoding can be used to predict experimental conditions based on given brain activity. The analysis does not rely on differences in activity, but differences in information. The goal is to decode brain activity based on an information-based model and find a discriminative pattern between two conditions. Applied to new, unseen data, the trained and tested model can ideally predict the correct class. In the case of the P3 experiment, it should be possible to decide whether the subject sees a Distractor or a Target letter. Accordingly, distractor against target must be decoded.
+        </br>
+        The task <em>run_decoding</em> works on a single-subject level. In principle, it would be possible to extend the analysis to several subjects. However, studies have already shown that there can be large differences between subjects. What is noise for one person could actually be a signal for another person. In contrast, information is consistently encoded when only a single subject is considered. But even in single-subject case, subjects are to be expected for which decoding results can only be considered to be at the chance level.
+        </br>
+        In the task <em>run_decoding</em> several approaches are bundled that can be used to decode EEG data. The basic question to be answered by the plots is the question of 'when': A user of the pipeline should be informed via the plots when the experimental conditions can be distinguished and thus find out when the effect of interest occurs. 
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Input data</h6>
+        The decoding analysis of <em>run_decoding</em> is based on the preprocessed epochs of a subject. Therefore, the results assume that the subject responds correctly and within an appropriate time window after stimulus onset. Epochs that do not meet these criteria are filtered out in the task make_epochs. In the P3 experiment, a distractor event occurred with a probability of 0.8, a target event with a probability of 0.2. To have a chance of 50% accuracy, the MNE function equalize_epoch_counts() is used to equalize the epoch count of each condition. In terms of duration, however, epochs are not restricted to a certain time window so that all their information is included in the decoding. Before decoding, the epochs are re-referenced to the average of all EEG channels. The reference underlying the previous pipeline steps, formed over the two channels P9 and P10, is focused on the peak analysis.
+        </br>
+        Actually, it should not be necessary to set a region of interest in space before decoding. The fine differences between the sensors should be used effectively by the decoder. It could even be helpful to have a slightly noisy channel in the data. This is because if it is highly correlated with the channel capturing the signal of interest, the noise can be removed via the useless channel and contribute to the decoding of information. Comparison of several pipeline runs with different configuration settings has revealed that decoding works best with channels from a specific region. P3 is greatest near the P3 electrode, but can be seen at any electrode in the upper half of the head. Accordingly, the decoding analysis was only performed with a selection of channels [source]. This selection can easily be changed via the config parameter roi.
+        </br>
+        All implemented decoding approaches use a cross validation scheme to prevent overfitting. The data is divided internally into a training and a test data set. The classifier is trained on the training data set. Tests based on the test data ensure an unbiased estimate of the accuracy. The resulting chance level should be 50%, as stratified cross-validation is used. The next section gives a brief overview of the decoding methods implemented in the task run_decoding:
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Logistic regression with sliding estimator</h6>
+        First, logistic regression is used as a machine learning model for binary classification. It serves as a statistical tool to find zeros and ones in given binary data. In this case, binary data corresponds to the given event types of each epoch. A threshold value can be defined via a hyperplane: a value below 0.5 indicates class 0, a value above 0.5 indicates class 1. A SlidingEstimator adjusts the logistic prediction model for time point. In the test phase, it ensures that it also evaluates its performance in new epochs at the corresponding point in time. 
+        </br>
+        <pre>
+            <code>
+scores_log_reg_scoring_methods[scoring_method] = mne.decoding.cross_val_multiscore(sliding_estimator, X, labels, cv=cv_log_reg, n_jobs=cfg.n_jobs, verbose=cfg.mne_log_level)
+scores_log_reg_scoring_methods[scoring_method] = np.mean(scores_log_reg_scoring_methods[scoring_method], axis=0)
+            </code>
+        </pre>
+        </br>
+        <h6>Common Spacial Pattern and Linear Discriminant Analysis with manual time windows</h6>
+        The second approach combines Common Spatial Pattern (CSP) and Linear Discriminant Analysis (LDA) via a pipeline. Since CSP requires several time points, no sliding estimator can be used. Therefore, iteration over the time windows is implemented manually. Epochs fed int the pipeline are additionally filtered via a low-pass filter with 2 Hz cut-off frequency to improve performance of CSP [source MNE]. CSP answers the question of where to look for the information. It aims to find a spatial filter that results in maximum variability between conditions. CSP can be used to find features that can be easily separated from highly correlated features using a classifier. The filter thus facilitates the distinction between the two classes. This first step in the pipeline serves as preparation for LDA. A rotation is applied that maximizes the separability between the two conditions. Maximal variability constraint of PCA is replaced by a maximal separability constraint in LDA.
+        </br>
+        <pre>
+            <code>
+pipe_csp_lda = sklearn.pipeline.Pipeline([('CSP', csp), ('LDA', lda)])
+score = sklearn.model_selection.cross_val_score(estimator=pipe_csp_lda, X=X_cropped, y=labels,
+scoring=cfg.scoring, cv=cv_csp_lda,
+n_jobs=cfg.n_jobs, error_score='raise', verbose=1)
+            </code>
+        </pre>
+        </br>
+        <h6>Temporal generalization</h6>
+        Using temporal generalization, it is possible to learn something about the temporal structure of the information. It shows how well decoding works when trying to decode the signal at each point in time. The estimated model obtained from the activity at a specific time is applied to the data at all other time points. 
+        <pre>
+            <code>
+generalizing_estimator = mne.decoding.GeneralizingEstimator(pipe_log_reg, n_jobs=cfg.n_jobs, scoring=cfg.scoring, verbose=cfg.mne_log_level)
+scores_temp_gen = mne.decoding.cross_val_multiscore(generalizing_estimator, X, labels, cv=cv_log_reg, n_jobs=cfg.n_jobs, verbose=cfg.mne_log_level)
+            </code>
+        </pre>
+    </implementation>
+    <csp>
+        The topomap <em>Patterns</em> shows how the EEG data is generated from the sources in the brain. On the other hand, the topomap <em>Filters</em> shows the regions from which the data can best be decoded. The topomap confirms that the information to be decoded is strongest in the upper half of the head. This confirms the selection of channels of interest. 
+    </csp>
+    <decoding_over_time>
+        The plot on the left is based on the pipeline combining CSP and LDA. Time windows of size 0.1s are used to calculate a score over time. For each window, the epochs are cropped to the size of the window and fed into the cross-validator to calculate the performance of the estimator. The plot shows the score over the epoch's time in units of area unter curve (AUC) due to the scoring method 'roc_auc' of the estimator.
+        <br/>
+        The plot on the right is derived from the estimator that uses a pipeline with a standard scaler (removes the mean and scales to unit variance) and a logistic regression classifier.
+        A sliding estimator leads to scores over time, shown in the plot again in units of area unter curve (AUC).
+        </br>
+        The scores of both variants clearly exceed the chance level of 0.5, in a time window in which it would be expected for the P3 experiment. The peak of the scores indicates when information about the two conditions Distractor and Target is available in the data of the specified channels of interest. 
+        However, strong fluctuations can be observed. In fact, the baseline should be flat: it should not be possible to decode which condition is present before the stimulus is shown to the subject. The attempt via equalize_epoch_count() 
+        to remove imbalance due to the different frequency of distractor and target does not seem to be sufficient. An exploration for further unconsidered correlation in the design is recommended.
+        </br>
+        It should be noted that the result of decoding over time still looks relatively good for subject 002. For other subjects, the decoding did not work at all. Here, even stronger fluctuations can be observed, and in some cases the results are not above the chance level.
+    </decoding_over_time>
+    <br/><br/>
+
+    <temporal_generalization>
+        Temporal generalization adds a dimension to the scores over time and is meant to evalutate how a time point may predict any other time point. MNE provides a generalizing estimator that is used with the same logistic regression pipeline as above. The resulting matric is shown in the next plot. The highest scores in units of area under curve (AUC) are achieved in a relatively coherent region in the upper right corner of the matrix. It is clearly visible that it is not sufficient to limit the information flowing into the decoder to the beginning of an epoch. The higher scores again point to the time window in which it was expected that information for distinguishing distractor and target would be available in the data.
+    </temporal_generalization>
+    <br/><br/>
+    <compare_diagonal>
+        The diagonal of the temporal generalization matix is equal to the score over time result of the logistic regression pipeline. This is tested in the script with:
+        <pre>
+            <code>
+np.testing.assert_almost_equal(scores_log_reg, np.diag(scores_temp_gen))
+            </code>
+        </pre>
+    </compare_diagonal>
+</decoding>
+<br/><br/>
+<source_localization>
+    <implementation>
+        The task <em>source_localization</em> aims to visualize the source of the main experimental contrast in the brain of a subject. Since the calculation of different source estimates is time-consuming, the report generation is outsourced to the task <em>source_localization_report</em>. To obtain the desired visualizations, the distractor, target, difference and total evoked of a subject are projected into a three-dimensional source space located in the brain anatomy. The three datasets are each re-referenced to the average reference and their bad channels are interpolated. The latter is to prevent noise being projected into the source space.
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Source space</h6>
+        The Boundary Element Model (BEM) for EEG contains the surface of the inner skull, the outer skull and the outer scalp. These surfaces mark transitions between different tissues and thus transitions between regions of different electrical conductivity. They are needed to compute the forward solution. However, the P3 dataset to be processed does not contain individual anatomical MRI scans of each subject. The task <em>source_localization</em> therefore relies on the standard template MRI subject <em>fsaverage</em> to obtain a BEM and calculate two different source spaces. The surface-based source space contains one part for the left and one part for the right hemisphere. The MNE function <em>setup_volume_source_space()</em> is used to calculate an additional volumetric source space.
+        </br>
+        When interpreting the results of the source localization without an individual MRI of a subject and without individually recorded electrode positions, it is important to note that the visualized activity locations can differ greatly from reality. The conductivities can be very different from subject to subject and have a great influence on the results. Also, the electrodes are not located over the same anatomical site across all subjects. Due to lack of data, the implementation cannot account for these issues and is based on an inadequate template.
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Noise Covariance</h6>
+        In order to correctly weight the channels when calculating the inverse solution, a regularised noise covariance matrix is constructed from the recordings. The resting state is to be considered as the basis of the noise. This means that the brain activity before stimulus onset is interpreted as noise with respect to the actual evoked response to be investigated.      
+        Therefore, the beginning of the epochs is used to calculate the covariance matrix, i.e. the time span between the start of an epoch and stimulus onset. The Epochs object used is the output of the previous task make_epochs. This ensures that the same filters and ICA settings are applied to the epochs as to the evokeds being projected. 
+        </br>
+        To obtain an accurate covariance matrix, the MNE documentation recommends baseline correction on the epochs before calculating the covariance matrix. However, it must kept in mind that the baseline correction also attenuates all activities in the source estimates that are similar to the baseline. The parameter setting <em>method='auto' </em>in the MNE function <em>compute_covariance</em> is intended to achieve an optimal regularisation of the covariance matrix via cross-validation. In principle, regularisation is recommended because the covariance matrix can be numerically unstable and correlations can occur between the estimated source amplitudes and the number of available samples. However, inappropriate regularisation could lead to an overestimation of the source amplitudes.
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Forward Solution</h6>
+        The forward solution computes the electrical potentials at the electrodes based on dipole sources in the cortex. This calculation step assumes the source activity and creates a pyhsical model of the brain. It simulates how brain activity spreads out the scalp to the electrodes. By solving this forward problem, one obtains exactly the activity that one would measure with the electrodes. This is based on a quasi-static approximation. The dipoles in the brain are estimated individually and summed up appropriately, but no interaction of these forward signals is assumed. In particular, the BEM and the source space object of the template subject <em>fsaverage</em> are passed to the MNE function <em>make_forward_solution</em> to return the forward solution.
+        </br>
+        <br></br>
+        <br></br>
+        <h6>Inverse Solution</h6>
+        In contrast to the forward problem, which is relatively easy to compute, the inverse problem is generally not uniquely solvable. There are several source activities that could lead to the recorded data. 
+        </br>
+        In MNE, the inverse solution is not calculated directly, but first an inverse operator is composed using the result of the forward solution and the noise covariance matrix. The noise covariance matrix incorporates information about the structure of the noise, ensuring that the noise is regulated, not the signal of interest. The parameter <em>loose</em> weights the source variances of the dipole components that are parallel to the cortical surface. The larger the value, the looser the orientation. It is assumed that grey matter generates the potentials. Strictly seen, the orientation of the dipoles would be fixed and always orthogonal to the orientation of the cortex. MNE allows a certain jitter around the orthogonally set dipoles via the setting of this parameter, which accounts for a certain inaccuracy in the measurements. The parameter <em>depth</em> determines whether and to what extent a depth weighting of the lead field is applied. This is to be seen in the context of distortion towards deep sources, which will be discussed in more detail in the following. Both parameters are left at their default settings of <em>loose=0.2</em> and <em>depth=0.8</em> for the inverse operator of the surface-based solution and tried to be slightly adjusted for the volume-based solution.
+        </br>
+        In a second step, the operator is applied to the different evoked datasets via <em>apply_inverse()</em>. This two-step procedure allows the regularisation parameter <em>lambda2</em> to be adjusted separately for the different evoked datasets. It represents a trade-off between reconstruction error and lowest source actvity. But the underlying L2 norm introduces a bias towards deep sources in the brain. The MNE implementation therefore uses many shallow sources near the scalp instead of one deep source. By means of suitable projection, an attempt is made to compensate for the distance dependency, which can be adjusted via the depth parameter mentioned above. In the task <em>source_localisation</em>, the same setting for <em>lambda2</em> is applied to all evokeds, but the parameter value can be set dynamically in <em>config.py</em>. The resulting source estimates are saved for further use by the next pipeline step.
+
+    </implementation>
+    <topomap_compare_covariance>
+        The plot compares three different topographic maps that visualize the diagonals of different covariance matrices: 
+        <ol>
+            <li>
+                The noise topomap refers to the actual covariance matrix, computed using epochs data from the start of an epoch to stimulus onset.
+            </li>
+            <li>
+                The data topomap is based on another covariance matrix calculated from epoch data after stimulus onset. This data is assumed to contain information about the brain activity to be investigated. 
+            </li>
+            <li>
+                The whitened topomap shows how the covariance matrix of the data of interest is whitened by the noise covariance matrix.
+            </li>
+        </ol>
+    </topomap_compare_covariance>
+    <br/><br/>
+    <source_estimates>
+        It should be noted that source reconstruction via EEG data is very difficult and the visualizations must be critically assessed. In particular, the results should not be over-interpreted because, as mentioned above, no individual anatomical MRI data per subject were available. The MNE output of the apply_inverse() function indicates how much % of the actually observed data is explained via the solution. These percentages are listed below, although are surprisingly high: 
+        <ul>
+            <li>Inverse operator applied to distractor evoked: Explained  99.8% variance</li>
+            <li>Inverse operator applied to target evoked: Explained  99.9% variance</li>
+            <li>Inverse operator applied to difference evoked: Explained  99.8% variance</li>
+            <li>Inverse operator applied to total evoked: Explained  99.8% variance</li>
+        </ul>
+        The following plots show the source estimates for total, distractor, target and difference at different points in time from +/- 0.2s around the respective peak. The activation plots below show the time evolution of the activation at the peak position of left/right hemisphere. The positions of the peaks are indicated by the blue and orange markers.
+    </source_estimates>
+    <movie>
+        The MNE class <em>mne.viz.Brain</em> is capable of generating a video with the configured layout of the interactive brain window. In the video, dorsal and ventral views, a time range of 0.2s to 0.7s and time dilation of 50 were used, the underlying data is the evoked difference. These views suggest that a higher activity can be found on the bottom of the brain which is in line with the cross section views of the source estimate plots. However, without calculating the statistical robustness of the data, such interpretations remain doubtful. 
+    </movie>
+    <br/><br/>
+    <volume>
+        The volumetric source estimate is generated by a similar procedure of forward solution and inverse operator as for the surface-based source estimate. It also uses template data for the BEM and MRI volume needed to setup the volume source space.
+    </volume>
+    <br/><br/>
+</source_localization>
+
+<manual_cleaning>
+    <annotate_raw>
+        The annotate_raw notebook was used to annotate the bad time segments and the bad channels. It reads in the filtered raw object of a subject to make the annotations in the interactive MNE cleaning window via raw.plot. Finally, the annotated bad time segments and bad channels can be written into the designated files manual-badSegments.tsv and manual-badChannels.tsv of the subject. The annotations of these files are added to the raw object in the pipeline step prepare_raw if the user wants to preprocess the subject manually. The annotated bad time segments are considered e.g. in the generation of epochs. With the parameter setting reject_by_annotation=True, the epoching function excludes all time spans for which a BAD_ annotation exists.
+        <br/><br/>
+        The BAD_ annotations were actually created by clicking-and-dragging the mouse in the annotation mode of the interactive MNE plot window. The data of the raw object was explored over the entire recording time and across all channels. For example, the complete beginning of the recording was always annotated as BAD_, because the electrodes need a certain time to get to equilibrium. Artefacts in EEG come from blinks, eye movements and muscle contractions. They have to be removed to increase the certainty that the results obtained later are indeed due to brain activity. The EOG signals gave an indication of where the subject blinked or moved his eyes. Corresponding time spans were annotated. It was also considered to which point in the experiment the examined data belonged. Cleaning was less restrictive at the times when the stimuli were presented in order not to exclude relevant brain activity from further processing. 
+        <br/><br/>
+        In addition to cleaning in time by annotating the bad time segments, cleaning in space could also have been done via the interactive MNE plot window. A source in the brain spreads to many electrodes, there is a lot of redundancy and a high correlation between the channels. In some recordings it happens that an electrode is not correctly placed on the head of the subject, that it moves or is just broken. Visual inspection of the raw data of all three subjects did not reveal any noisy electrode. No noisy data was seen in any of the channels. Therefore, it was considered sufficient to limit cleaning via 101_annotate_raw.ipynb to the bad time segments. As a result, the files manual-badChannels.tsv are empty.
+    </annotate_raw>
+    <label_badComponents>
+        The script 102_label_badComponents.py is also not part of the pipeline. It applies the ICA decomposition generated via the pipeline to the prepared raw of the three subjects 002, 003, 004. For each subject, different plots of the ICA solution are provided to manually identify the artifactual ICs based on these plots. The numbers of the ICs are finally recorded in a tsv file. The tsv file is obtained from the pipeline in the apply_ica step when the user requests manual preprocessing for a subject. In the following, the ICA solution of Subject 2 is used to explain which criteria were used to classify the ICs. The two sources [Source 2] and [Source 3] gave assistance in interpreting the plots. Analogous to Subject 002, the ICA artifact rejection was performed for Subjects 003 and 004. 
+    </label_badComponents>
+    <workflow>
+        The most important information for the evaluation of the individual ICs was the plot of their properties. For example using this plot, IC 4 can be identified as a brain component for Subject 002. Its scalp topography indicates that the component can be traced back to a single dipole in the brain. The power spectrum also supports this assumption, as a peak can be seen at 10 Hz. Brain components tend to show repeating patterns at certain frequencies, leading to a peak in the power spectrum. In particular, these peaks are observed at a frequency of 10 Hz [Source 2]. The segment image of IC 4 is based on segmented data of the entire raw object. As expected, no time-locked activity can be detected in this segmented continuous data. However, the brain activity is relatively uniform across many segments. No individual highlights emerge. The plot of the component's variance over time across channels also supports the assumption that it captures brain activity. Compared to other components, IC 4 shows a similar and low variance across the segments.
+        <br/><br/>
+        On the other hand ICs 0 and 11 were identified as eye components. The source of IC 0 is assumed to be blinks of the subject, IC 11 refers to horizontal eye movements of the subject. For both components, the scalp topography visualizes that the components have a strong effect on the electrodes placed close to the eyes. The plot thus indicates an origin of the source near the eyes. In the scalp topography of IC 11, maxima with opposite polarity occur at the front left and right. This is typical for horizontal eye movements of the subject. In the PSD, both ICs lack the peak at 10 Hz that is characteristic of a brain component. Instead, blink artefacts appear in a peak at the low frequency end of the spectrum. Especially IC 0 shows clear evidence of blinks. These show up in the image segment as relatively short stripe. They occur from time to time, but not evenly distributed and not in every segment. Another hint that the components are to be classified as artifacts is the plot of their variance. Most segments have a low variance. However, viewed over time, individual segments repeatedly have a very high variance. This indicates noise in the data.
+        <br/><br/>
+        After inspecting the IC property plots, the two ICs 0 and 11 were listed as bad components in the code of label_badComponents.py. Muscle components could not be detected in the ICA decomposition of Subject 002. Since their source is not within the brain, they would appear very flat on the scalp topography, i.e. relatively concentrated in small regions. In addition, increased high frequency activity is characteristic of muscle components. Neither the scalp topography plots nor the PSDs of the ICs of Subject 002 clearly indicate a muscle component. Therefore no further IC was marked for exclusion. Overall, the marking of bad components was based on the idea of marking as few as possible and only clearly artefactual ICs for exclusion. Otherwise, actual brain activity could be lost through cleaning.
+        <br/><br/>
+        The overlay plot was used to assess how well the cleaning worked by excluding the artifactual ICs. It shows the raw data before and after the ICA artifact rejection. In addition, a cross-channel average is shown. Dipolar sources are cancelled out by the averaging, whereas peaks are an indication of artefacts. The overlay plot of Subject 002 supports the assumption that artefacts were excluded from the signal with ICs 0 and 11. While clear peaks are visible in the signal before cleaning, they disappeared after cleaning.
+    </workflow>
+</manual_cleaning>

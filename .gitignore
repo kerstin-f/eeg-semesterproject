@@ -1,0 +1,9 @@
+data
+figures
+processed
+__pycache__
+*.pyc
+.doit*
+system_check.txt
+to_do.txt
+test.py

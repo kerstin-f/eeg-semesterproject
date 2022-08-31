@@ -1,0 +1,8 @@
+numpy>=1.13
+scipy>=0.19
+matplotlib>=1.5
+mne>=0.16
+doit>=0.30
+h5io
+pyvistaqt 
+PyQt5
